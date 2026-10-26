@@ -1,0 +1,17 @@
+{
+  "name": "@hisaab/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "db:migrate": "prisma migrate dev"
+  },
+  "devDependencies": {
+    "prisma": "7.10.1"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.10.1"
+  }
+}
