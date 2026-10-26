@@ -92,33 +92,60 @@ Amounts in rupees for readability. Real values are paise.
 8. **Reconcile**: `bal icici 85000` when the ledger says 84200 creates an
    ADJUSTMENT of +800 and replies with the difference.
 
-## 6. Message grammar (draft, finalize in M1)
+## 6. Message grammar (final, M1)
 
-Deterministic, tokenized, case-insensitive. No LLM.
+Deterministic, tokenized, case-insensitive. No LLM. Implemented in `packages/core`.
 
 ```
-open <alias> <amount> <kind>          create account with opening balance
-in <amount> <desc> <account>          income
-<desc...> <amount> [<account>]        expense (account optional if default set)
-xfer <amount> <from> <to>             transfer
-pay <card> <amount> from <bank>       card bill payment (sugar for xfer)
-emi <amount> <account>                expense, category "Home loan EMI"
-lend <person> <amount> <account>      transfer to receivable
-got <person> <amount> <account>       repayment from receivable
-<desc...> <amount> split <p1> <a1> [<p2> <a2> ...] [<account>]
-bal [<account>] [<amount>]            show balance, or reconcile to stated amount
-undo                                  void the last transaction
-accounts                              list accounts and balances
+[<date>] <desc...> <amount> <account>              expense
+[<date>] in <amount> <desc...> <account>           income
+[<date>] xfer <amount> <from> <to>                 transfer
+[<date>] pay <card> <amount> from <bank>           card bill payment (transfer)
+[<date>] emi <amount> <account>                    expense, category "Home loan EMI"
+[<date>] lend <person> <amount> <account>          transfer to receivable
+[<date>] got <person> <amount> <account>           repayment from receivable
+[<date>] <desc...> <amount> split <p1> <a1> [<p2> <a2> ...] <account>
+open <alias> <amount> <kind>                       kinds: bank cc receivable payable loan
+bal [<account>] [<amount>]                         show balance, or reconcile to stated amount
+accounts                                           list accounts and balances
+undo                                               void the last transaction
 ```
 
-Amount forms: `450`, `4k`, `1.5k`, `1.2l` / `1.2L` (lakh). Anything ambiguous returns a
-clarifying question and writes **nothing**.
+- At the end of an expense, `in`, `emi`, `lend`, `got` or `split`, the account is one alias or
+  `cc <x>` meaning the alias `<x>cc` (`cc icici` is `icicicc`). `xfer`, `pay` and `bal` take plain
+  aliases only (`xfer 5k icici icicicc`).
+- The first token is the command. Command words always win; there is no escape prefix.
+- Amount forms: `450`, `4k`, `1.5k`, `1.25k`, `1.2l` / `1.2L` (lakh), `450.50`. Must be a
+  whole number of paise, at most 10 crore, and greater than zero, except the opening balance in
+  `open` and the stated amount in `bal`, which may be 0. `1,200` and `₹500` are rejected.
+- Date prefix (entries only; not on `open`, `bal`, `accounts`, `undo`): `today`, `yesterday`,
+  `on 20 oct`, `on 20 oct 2025`. Month names are 3-letter or full. The year defaults to the
+  current IST year; a date in the future is rejected, never rolled back a year. An explicit
+  year must be 20xx. Backdated entries are stamped 12:00 IST; undated entries use the
+  receive time. Time is IST (UTC+5:30, fixed).
+- Credit cards, payables and loans: a stated amount (`open`, `bal`) means the amount owed and
+  is stored as a negative balance. A stated bank balance cannot be negative, but spending and
+  transfers can still overdraw a bank account.
+- `xfer` works between BANK, CREDIT_CARD and LOAN accounts (so `xfer` to a card also works as a
+  bill payment). Use `lend` and `got` for people. PAYABLE accounts exist only via `open` for now.
+- Account kind words for `open`: `bank`, `cc` (or `credit_card`), `receivable`, `payable`, `loan`.
+- `got` may exceed what the person owes; the receivable then goes negative. No warning in v1.
+- `lend`, `got` and `split` people must exist as RECEIVABLE accounts (`open sam 0 receivable`).
+  Split: own share may be zero; each person once, non-zero; shares may not exceed the total.
+- `bal` alone is the same as `accounts`. `bal <amount>` without an account is a question.
+- Anything ambiguous returns a clarifying question and writes **nothing**: unknown command,
+  missing or unknown account, missing description, more than one amount, bad amount, bad or
+  future date, wrong account kind, same account twice, bad split, duplicate or reserved alias.
+- Unrecognised category (expenses and splits): keyword rules only in M1. No match, keywords from
+  two categories, or an income category such as "salary advance", stores the transaction with a
+  null category and status `NEEDS_REVIEW`. Income is `Salary` on a salary keyword, else `Other income`.
 
 Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI-CC. Reply "undo" to revert.`
 
-**Categorization**: keyword rules first (petrol, swiggy, rent...). LLM fallback may
-only choose a category from a fixed list given the free-text description. It never
-sees or alters amounts, accounts, or type. Low confidence goes to `NEEDS_REVIEW`.
+**Categories** (fixed): Food, Groceries, Transport, Rent, Utilities, Shopping, Entertainment,
+Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. Keyword rules first; the
+LLM fallback may only choose from this list given the free-text description. It never sees or
+alters amounts, accounts, or type.
 
 ## 7. Architecture (HLD)
 
@@ -231,6 +258,6 @@ is enough.
   account) from interest (expense).
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
 - Omitted account: DECIDED, reply with a clarifying question, write nothing.
-- Category list: fixed seed list. Edit in M1.
+- Category list: DECIDED, fixed list in section 6. Add keywords as real use shows gaps.
 - Dashboard auth: DECIDED, Better Auth + Google OAuth with email allowlist.
 - Channel: DECIDED, Telegram (secret-token header instead of `X-Hub-Signature-256`). WhatsApp optional later.

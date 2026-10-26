@@ -1,0 +1,86 @@
+export const CATEGORIES = [
+  'Food',
+  'Groceries',
+  'Transport',
+  'Rent',
+  'Utilities',
+  'Shopping',
+  'Entertainment',
+  'Health',
+  'Travel',
+  'Subscriptions',
+  'Home loan EMI',
+  'Salary',
+  'Other income',
+] as const;
+
+export type Category = (typeof CATEGORIES)[number];
+
+const INCOME_CATEGORIES: readonly Category[] = ['Salary', 'Other income'];
+
+/** Spending never carries an income category; it goes to review instead. */
+export const spendCategory = (c: Category | null): Category | null =>
+  c !== null && INCOME_CATEGORIES.includes(c) ? null : c;
+
+const KEYWORDS: Partial<Record<Category, string[]>> = {
+  Food: [
+    'swiggy',
+    'zomato',
+    'dinner',
+    'lunch',
+    'breakfast',
+    'coffee',
+    'restaurant',
+  ],
+  Groceries: [
+    'groceries',
+    'grocery',
+    'blinkit',
+    'zepto',
+    'bigbasket',
+    'vegetables',
+  ],
+  Transport: [
+    'petrol',
+    'diesel',
+    'fuel',
+    'uber',
+    'ola',
+    'metro',
+    'auto',
+    'cab',
+    'parking',
+    'fastag',
+  ],
+  Rent: ['rent'],
+  Utilities: [
+    'electricity',
+    'water',
+    'gas',
+    'internet',
+    'wifi',
+    'broadband',
+    'recharge',
+  ],
+  Shopping: ['amazon', 'flipkart', 'myntra', 'clothes', 'shoes'],
+  Entertainment: ['movie', 'movies', 'pvr', 'concert', 'games'],
+  Health: ['doctor', 'medicine', 'pharmacy', 'hospital', 'gym'],
+  Travel: ['flight', 'hotel', 'train', 'irctc', 'trip'],
+  Subscriptions: ['netflix', 'spotify', 'prime', 'youtube', 'icloud'],
+  Salary: ['salary', 'payroll'],
+};
+
+/**
+ * Deterministic keyword match on whole lowercase tokens. Returns null when
+ * nothing matches or keywords from different categories conflict; the caller
+ * marks that NEEDS_REVIEW.
+ */
+export function categorize(description: string): Category | null {
+  const tokens = description.toLowerCase().split(/[^a-z0-9]+/);
+  const hits = new Set<Category>();
+  for (const [category, words] of Object.entries(KEYWORDS)) {
+    if (words.some((w) => tokens.includes(w))) hits.add(category as Category);
+  }
+  if (hits.size !== 1) return null;
+  return [...hits][0] ?? null;
+}

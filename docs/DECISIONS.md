@@ -45,3 +45,39 @@ Why: pnpm 12 blocks install scripts by default. workerd arrives transitively via
 
 **Vitest root config lists projects explicitly (`packages/core` only for now).**
 Why: projects without tests fail startup config. Add each package when it gets tests.
+
+## 2026-10-26 (M1 core)
+
+**`interpret(text, ctx)` is the pure core; `ingest()` (M2) wraps it with persistence and dedupe.**
+Why: keeps `core` free of I/O and the ledger rules testable without a database. The caller passes
+a snapshot of accounts with derived balances and `now`; there is no Clock or Repository interface
+in M1 because nothing has two implementations yet.
+
+**`interpret` builds every transaction through the builders in `ledger.ts`, and each runs `checkInvariants`.**
+Why: the property tests then exercise the real construction path, and a rule violation throws
+instead of being written. `ProposedTx` is a plain interface, so this is a convention, not enforced
+by types; `checkInvariants` has its own negative tests for that reason.
+
+**Time is IST (fixed UTC+5:30), no timezone library.**
+Why: IST has no DST. Backdated entries are stamped 12:00 IST on the chosen day. `occurredAt`
+is stored as an instant; the dashboard (M5) must group by IST day, not UTC.
+
+**Date prefix: an explicit year is accepted only as 20xx; a year-less date in the future is rejected.**
+Why: avoids reading an amount like `4000` as a year, and avoids silently logging to last year.
+
+**Amount cap of 10 crore; fractions must be whole paise.**
+Why: catches an extra zero. Nothing is rounded, so paise can never be lost silently.
+
+**Owed kinds (credit card, payable, loan) take stated amounts as "amount owed", stored negative.**
+Why: matches how a card statement reads. Banks must be >= 0, so overdrafts are not expressible.
+
+**`got` may exceed the amount owed; the receivable goes negative.**
+Why: accepted as an M1 default (overpayment allowed). The code reviewer flagged the negative
+receivable; revisit if it causes confusion.
+
+**Uncategorised expenses and splits are still written, with null category and NEEDS_REVIEW; income categories never apply to spending.**
+Why: losing the entry is worse than a missing label. Ambiguity about amount, account or type is
+different: that writes nothing.
+
+**Open for M2: `undo` and `bal <x> <amount>` must read the last transaction / current balance in
+the same DB transaction as the write; undo targets (adjustments, already-voided rows) are decided in the M2 plan.**
