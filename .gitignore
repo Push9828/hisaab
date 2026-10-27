@@ -8,3 +8,6 @@ coverage
 *.tsbuildinfo
 .DS_Store
 src/generated
+
+# blog drafts stay local
+docs/blog/
