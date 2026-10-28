@@ -65,7 +65,7 @@ card bill payments and internal transfers out of spending.
 2. TRANSFER entries sum to zero.
 3. SPLIT: payer entry = -total; receivable entries sum to the others' shares; `spendAmount = total - sum(others' shares)`; own share must be >= 0.
 4. Voided transactions are excluded from balances and reports. Nothing is ever hard-deleted.
-5. A given (channel, externalMessageId) is processed at most once.
+5. A given (channel, externalMessageId) is processed at most once. This holds for every message that writes anything (transactions, `open`, `undo`), not only those that create a Transaction.
 6. Account balance is always derivable from opening balance + entries. No stored running balance.
 
 ## 5. Worked examples (acceptance tests)
@@ -108,7 +108,7 @@ Deterministic, tokenized, case-insensitive. No LLM. Implemented in `packages/cor
 open <alias> <amount> <kind>                       kinds: bank cc receivable payable loan
 bal [<account>] [<amount>]                         show balance, or reconcile to stated amount
 accounts                                           list accounts and balances
-undo                                               void the last transaction
+undo                                               void the latest non-voided transaction (adjustments included; `open` is not undoable)
 ```
 
 - At the end of an expense, `in`, `emi`, `lend`, `got` or `split`, the account is one alias or
@@ -212,6 +212,16 @@ model Entry {
   account       Account     @relation(fields: [accountId], references: [id])
 }
 
+// One row per processed message that wrote something. Claimed before the write,
+// in the same DB transaction. Covers `undo` and `open`, which create no Transaction.
+model ProcessedMessage {
+  channel    String
+  externalId String
+  createdAt  DateTime @default(now())
+
+  @@id([channel, externalId])
+}
+
 enum AccountKind { BANK CREDIT_CARD RECEIVABLE PAYABLE LOAN }
 enum TxType { INCOME EXPENSE TRANSFER SPLIT ADJUSTMENT }
 enum TxStatus { CONFIRMED NEEDS_REVIEW }
@@ -221,7 +231,7 @@ enum TxStatus { CONFIRMED NEEDS_REVIEW }
 
 - Verify the webhook secret (Telegram: `X-Telegram-Bot-Api-Secret-Token`, constant-time compare). Reject on mismatch.
 - Allowlist the sender id. Ignore everything else silently.
-- Idempotency via the unique (channel, externalId) constraint. Channels retry.
+- Idempotency via the `ProcessedMessage` primary key (channel, externalId), with the unique on `Transaction` as a backstop. Channels retry.
 - Secrets in environment or AWS Secrets Manager. Never in the repo. `.env` is gitignored.
 - Dashboard requires auth. It is financial data on a public URL.
 - Logs must not contain full message bodies or balances.

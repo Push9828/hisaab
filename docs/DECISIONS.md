@@ -81,3 +81,25 @@ different: that writes nothing.
 
 **Open for M2: `undo` and `bal <x> <amount>` must read the last transaction / current balance in
 the same DB transaction as the write; undo targets (adjustments, already-voided rows) are decided in the M2 plan.**
+
+## 2026-10-28 (M2 plan)
+
+**M2 starts clean; the reverted M2a/M2b commits are not reused.**
+Why: chosen by the author to rebuild with full understanding, one reviewed step at a time (see `docs/M2-PLAN.md`).
+
+**Idempotency uses a `ProcessedMessage(channel, externalId)` table, claimed before any write.**
+Why: `undo`, `open` and reconcile create no Transaction row, so the unique on `Transaction` cannot
+dedupe them, and a replayed `undo` would void a second transaction (hard rule 6). SPEC section 8 and
+invariant 5 updated. The unique on `Transaction` stays as a backstop. Clarifications and read-only
+replies claim nothing, so a clarified message can be retried with the same id.
+
+**A replayed message is a no-op that returns `duplicate: true`.**
+Why: the adapter decides whether to reply. `core` does not try to reproduce the original reply.
+
+**`undo` voids the latest non-voided transaction in creation order, adjustments included. `open` is not undoable.**
+Why: simplest rule that matches "void the last transaction". Repeated undo walks backwards. Accounts
+are not transactions. Nothing to void replies "Nothing to undo." and writes nothing.
+
+**`ingest` talks to storage only through `LedgerStore.run(fn)`, one atomic unit per message.**
+Why: keeps `core` free of `db` imports and satisfies "read and write in the same DB transaction".
+`MemoryStore` (tests) and `PrismaStore` (production) share one contract test suite.
