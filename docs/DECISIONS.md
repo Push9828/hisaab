@@ -105,13 +105,3 @@ Possible v2 hardening: null `rawText` after N days. Not built.
 `Transaction(voidedAt, occurredAt)`; `onDelete: Restrict` on Entry relations (nothing is hard-deleted); lowercase
 aliases enforced by CHECK; CHECKs `amount <> 0`, `spendAmount >= 0`, and `spendAmount = 0` for TRANSFER and
 ADJUSTMENT (hard rule 3, enforced in the database as well as in `checkInvariants`).
-
-**`ingest()` marks every message processed first, including clarifications and reads.**
-Why: the plan only recorded writes, but then a replayed `open` would re-interpret against the new account
-list and send a spurious "already exists" reply. Marking first makes every replay a silent `duplicate`, and a
-failed write rolls the marker back with everything else, so a retry is not mistaken for a replay.
-
-**`LedgerStore` has one `markProcessed` method (returns false on replay) instead of a `DuplicateMessageError`.**
-Why: in Postgres a unique violation aborts the whole transaction, so the db implementation uses
-`INSERT ... ON CONFLICT DO NOTHING` and reports whether a row was inserted. Concurrent same-key inserts block
-until the first commits, then do nothing. `MemoryStore` (tests only, not exported from `index.ts`) is the second implementation.
