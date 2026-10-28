@@ -20,3 +20,5 @@ export type {
   TxStatus,
   TxType,
 } from './types';
+export { ingest, type IncomingMessage, type IngestOutcome } from './ingest';
+export type { ActiveTx, LedgerStore, MessageMeta, NewAccount } from './store';
