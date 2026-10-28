@@ -81,3 +81,27 @@ different: that writes nothing.
 
 **Open for M2: `undo` and `bal <x> <amount>` must read the last transaction / current balance in
 the same DB transaction as the write; undo targets (adjustments, already-voided rows) are decided in the M2 plan.**
+
+## 2026-10-28 (M2 persistence)
+
+**Idempotency uses a `ProcessedMessage(channel, externalId)` unique table, inserted for every write inside the same DB transaction.**
+Why: `undo` and `open` create no Transaction row, so the Transaction unique constraint cannot dedupe them and a
+replayed `undo` would void a second transaction. Departs from the SPEC section 8 sketch (which only has the
+Transaction constraint). The Transaction `(channel, externalId)` unique constraint stays as a second layer.
+
+**A replayed message gets no reply.**
+Why: simplest. Known gap: if the first attempt committed but crashed before the adapter replied, the reply is lost.
+Revisit by storing the reply text if that ever happens.
+
+**`undo` voids the newest non-voided transaction (ordered by `createdAt`, then `id`, not `occurredAt`). ADJUSTMENT is undoable; `open` is not.**
+Why: backdated entries must not change what "last" means. `open` creates an account, not a transaction, and the
+reply says it cannot be undone. With nothing to undo the reply is "Nothing to undo" and nothing is written.
+
+**`rawText` is stored in the DB; it is never logged.**
+Why: audit trail and the ability to re-parse after a grammar fix. Hard rule 8 restricts logs, not storage.
+Possible v2 hardening: null `rawText` after N days. Not built.
+
+**Schema additions over the SPEC section 8 sketch:** indexes on `Entry(accountId)`, `Entry(transactionId)` and
+`Transaction(voidedAt, occurredAt)`; `onDelete: Restrict` on Entry relations (nothing is hard-deleted); lowercase
+aliases enforced by CHECK; CHECKs `amount <> 0`, `spendAmount >= 0`, and `spendAmount = 0` for TRANSFER and
+ADJUSTMENT (hard rule 3, enforced in the database as well as in `checkInvariants`).

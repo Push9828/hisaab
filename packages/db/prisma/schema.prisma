@@ -6,3 +6,74 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+model Account {
+  id             String      @id @default(cuid())
+  alias          String      @unique // lowercase, enforced by CHECK
+  name           String
+  kind           AccountKind
+  openingBalance BigInt      @default(0)
+  entries        Entry[]
+  createdAt      DateTime    @default(now())
+}
+
+model Transaction {
+  id          String    @id @default(cuid())
+  type        TxType
+  occurredAt  DateTime
+  description String
+  category    String?
+  spendAmount BigInt    @default(0) // my real spending; 0 for transfers/income/adjustments
+  status      TxStatus  @default(CONFIRMED)
+  voidedAt    DateTime?
+  channel     String
+  externalId  String // message id from the channel
+  rawText     String
+  entries     Entry[]
+  createdAt   DateTime  @default(now())
+
+  @@unique([channel, externalId])
+  @@index([voidedAt, occurredAt])
+}
+
+model Entry {
+  id            String      @id @default(cuid())
+  transactionId String
+  accountId     String
+  amount        BigInt // signed paise, negative = leaves account
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])
+  @@index([transactionId])
+}
+
+// One row per handled write message, including undo and open, which create no Transaction.
+model ProcessedMessage {
+  channel     String
+  externalId  String
+  processedAt DateTime @default(now())
+
+  @@id([channel, externalId])
+}
+
+enum AccountKind {
+  BANK
+  CREDIT_CARD
+  RECEIVABLE
+  PAYABLE
+  LOAN
+}
+
+enum TxType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  SPLIT
+  ADJUSTMENT
+}
+
+enum TxStatus {
+  CONFIRMED
+  NEEDS_REVIEW
+}
