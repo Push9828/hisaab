@@ -53,6 +53,13 @@ export function storeContract(name: string, make: () => Promise<LedgerStore>) {
       expect(await balance(store)).toBe(900n);
     });
 
+    it('rejects a duplicate alias and writes nothing', async () => {
+      const store = await make();
+      await seed(store);
+      await expect(seed(store)).rejects.toThrow();
+      expect(await store.run((db) => db.accounts())).toHaveLength(1);
+    });
+
     it('is exact above 2^53 (no Number coercion)', async () => {
       const store = await make();
       const a = await seed(store, 2n ** 60n + 1n);
@@ -90,6 +97,8 @@ export function storeContract(name: string, make: () => Promise<LedgerStore>) {
       expect(await store.run((db) => db.claim('whatsapp', '1'))).toBe(true);
     });
 
+    // Both stores serialise runs (MemoryStore queue, Postgres advisory lock),
+    // which is what makes this pass.
     it('concurrent claims of one message: exactly one wins', async () => {
       const store = await make();
       const wins = await Promise.all([

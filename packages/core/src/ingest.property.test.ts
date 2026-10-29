@@ -87,8 +87,7 @@ it('balances, spend, voiding and replays match the model after every step', asyn
         const before = store.snapshot();
         const e = expected(c);
 
-        if (c.t === 'replay' || !e) {
-          if (c.t !== 'replay') continue;
+        if (c.t === 'replay') {
           if (sent.length === 0) continue;
           // Invariant 5: a redelivery, whatever its text, changes nothing.
           const out = await send('undo', sent[c.k % sent.length] as string);
@@ -96,6 +95,7 @@ it('balances, spend, voiding and replays match the model after every step', asyn
           expect(store.snapshot()).toEqual(before);
           continue;
         }
+        if (!e) throw new Error('only replay has no message');
 
         const id = `m${sent.length}`;
         expect((await send(e.text, id)).duplicate).toBe(false);

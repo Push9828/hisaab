@@ -94,6 +94,10 @@ export class MemoryStore implements LedgerStore {
         ),
 
       createAccount: (account) => {
+        // Postgres has a unique index on alias; this keeps the stores in step.
+        if (draft.accounts.some((a) => a.alias === account.alias)) {
+          return Promise.reject(new Error('alias already exists'));
+        }
         draft.accounts.push({ ...account, id: `acc-${this.nextId++}` });
         return Promise.resolve();
       },
