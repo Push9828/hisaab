@@ -103,3 +103,17 @@ are not transactions. Nothing to void replies "Nothing to undo." and writes noth
 **`ingest` talks to storage only through `LedgerStore.run(fn)`, one atomic unit per message.**
 Why: keeps `core` free of `db` imports and satisfies "read and write in the same DB transaction".
 `MemoryStore` (tests) and `PrismaStore` (production) share one contract test suite.
+
+## 2026-10-29 (M2 step 5)
+
+**`Transaction.seq` (autoincrement, unique) defines creation order; `undo` voids the highest non-voided `seq`.**
+Why: `createdAt DEFAULT now()` is fixed for a whole Postgres transaction and cuids are not ordered, so
+"latest" could tie. `seq` matches `MemoryStore`'s insertion order exactly. SPEC section 8 updated.
+
+**Hand-written CHECKs in the init migration: `spendAmount >= 0`, `spendAmount = 0` for TRANSFER, ADJUSTMENT and INCOME, `Entry.amount <> 0`.**
+Why: a second line of defence for hard rule 3. Cross-row rules (transfer sums, split arithmetic) stay in
+`checkInvariants` and the property tests, since DB triggers for them would be over-engineering.
+
+**Entry foreign keys are `onDelete: Restrict`.** Why: nothing is hard-deleted (hard rule 4).
+
+**Open for step 6: serialise concurrent `run()` calls (advisory lock, matching `MemoryStore`) so two undos cannot pick the same row.**

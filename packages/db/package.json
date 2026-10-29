@@ -6,7 +6,10 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "db:generate": "prisma generate",
+    "db:up": "docker compose -f ../../docker-compose.yml --env-file .env up -d --wait",
+    "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"
   },
   "devDependencies": {
     "prisma": "7.10.1"

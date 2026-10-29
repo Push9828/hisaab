@@ -1,0 +1,21 @@
+# Local development database only. Values come from packages/db/.env
+# (copy packages/db/.env.example); nothing secret is committed.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?copy packages/db/.env.example to packages/db/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy packages/db/.env.example to packages/db/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?copy packages/db/.env.example to packages/db/.env}
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - hisaab-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER}']
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  hisaab-pgdata:

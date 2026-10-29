@@ -7,7 +7,7 @@ dist
 coverage
 *.tsbuildinfo
 .DS_Store
-src/generated
+**/src/generated
 
 # blog drafts stay local
 docs/blog/

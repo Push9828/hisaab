@@ -199,6 +199,7 @@ model Transaction {
   rawText      String
   entries      Entry[]
   createdAt    DateTime @default(now())
+  seq          Int      @unique @default(autoincrement()) // creation order; `undo` voids the highest non-voided seq
 
   @@unique([channel, externalId])
 }
@@ -208,8 +209,11 @@ model Entry {
   transactionId String
   accountId     String
   amount        BigInt      // signed paise, negative = leaves account
-  transaction   Transaction @relation(fields: [transactionId], references: [id])
-  account       Account     @relation(fields: [accountId], references: [id])
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       Account     @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([accountId])     // balance = grouped sum over this
+  @@index([transactionId])
 }
 
 // One row per processed message that wrote something. Claimed before the write,
