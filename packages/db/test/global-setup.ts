@@ -1,21 +1,15 @@
-import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
+
+import { assertTestDatabaseUrl } from './test-db';
 
 // Creates the test database if needed and brings it to the current migrations.
 export default async function setup() {
-  if (!process.env.TEST_DATABASE_URL) {
-    throw new Error(
-      'TEST_DATABASE_URL is not set. See packages/db/.env.example.',
-    );
-  }
-  const url = new URL(process.env.TEST_DATABASE_URL);
+  const url = assertTestDatabaseUrl(process.env.TEST_DATABASE_URL);
   const name = url.pathname.slice(1);
-  if (!/^[a-z0-9]+(_[a-z0-9]+)*_test$/.test(name)) {
-    throw new Error(
-      'TEST_DATABASE_URL must point at a database ending in _test',
-    );
-  }
 
   const admin = new pg.Client({
     connectionString: Object.assign(new URL(url), {
@@ -33,9 +27,12 @@ export default async function setup() {
     await admin.end();
   }
 
-  execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
-    cwd: new URL('..', import.meta.url).pathname,
-    env: { ...process.env, DATABASE_URL: url.toString() },
-    stdio: 'pipe',
-  });
+  const pool = new pg.Pool({ connectionString: url.toString() });
+  try {
+    await migrate(drizzle(pool), {
+      migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
+    });
+  } finally {
+    await pool.end();
+  }
 }

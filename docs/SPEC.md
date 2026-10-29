@@ -160,7 +160,7 @@ packages/core: ingest(text, sender) -> parse -> validate -> ledger write
         |                                   |
         |                                   +--> categorizer (rules, LLM fallback)
         v
-Postgres (Neon or Supabase free tier) via Prisma
+Postgres (Neon or Supabase free tier) via Drizzle
         ^
         |  server-side reads
 Next.js dashboard (Better Auth + Google OAuth, email allowlist)
@@ -172,7 +172,10 @@ thin adapter, so the channel can be swapped without touching ledger logic.
 Later: EventBridge -> Lambda for recurring rules (rent, SIP, monthly transfer) and
 for Splitwise polling.
 
-## 8. Data model sketch (Prisma)
+## 8. Data model sketch
+
+Illustrative and tool-neutral. The real schema, including the CHECK constraints, is
+`packages/db/src/schema.ts`; ids are generated UUID text and timestamps are `timestamptz`.
 
 ```prisma
 model Account {
@@ -199,7 +202,7 @@ model Transaction {
   rawText      String
   entries      Entry[]
   createdAt    DateTime @default(now())
-  seq          Int      @unique @default(autoincrement()) // creation order; `undo` voids the highest non-voided seq
+  seq          Int      @unique @default(autoincrement()) // identity; creation order; `undo` voids the highest non-voided seq
 
   @@unique([channel, externalId])
 }
@@ -247,7 +250,7 @@ enum TxStatus { CONFIRMED NEEDS_REVIEW }
 |---|---|---|
 | M0 | Repo scaffold, lint, test runner, CI | Oct 25 |
 | M1 | `core`: money type, parser, ledger rules, **all section 5 examples as passing tests**. No I/O | Oct 26 |
-| M2 | Prisma schema, `ingest()` with persistence, idempotency, undo, bal/reconcile | Nov 1 |
+| M2 | DB schema, `ingest()` with persistence, idempotency, undo, bal/reconcile | Nov 1 |
 | M3 | Channel adapter running locally behind a tunnel, end-to-end from the real chat app | Nov 2 |
 | M4 | Deploy Lambda, permanent token, signature verification | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |

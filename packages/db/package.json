@@ -6,19 +6,18 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "db:migrate": "prisma migrate dev",
-    "db:generate": "prisma generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
     "db:up": "docker compose -f ../../docker-compose.yml --env-file .env up -d --wait",
     "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
-    "prisma": "7.10.1"
+    "drizzle-kit": "0.31.11"
   },
   "dependencies": {
     "@hisaab/core": "workspace:*",
-    "@prisma/adapter-pg": "^7.10.1",
-    "@prisma/client": "^7.10.1",
+    "drizzle-orm": "0.45.4",
     "pg": "^8.23.1"
   }
 }

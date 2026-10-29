@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Use BEFORE implementing anything that touches more than 3 files, changes the Prisma schema, or adds a new module. Produces a short implementation plan; writes no code.
+description: Use BEFORE implementing anything that touches more than 3 files, changes the DB schema, or adds a new module. Produces a short implementation plan; writes no code.
 tools: Read, Grep, Glob
 ---
 

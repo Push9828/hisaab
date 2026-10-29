@@ -13,6 +13,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
+    "db:generate": "pnpm --filter @hisaab/db db:generate",
     "db:migrate": "pnpm --filter @hisaab/db db:migrate"
   },
   "devDependencies": {

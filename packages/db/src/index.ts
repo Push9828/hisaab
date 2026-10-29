@@ -1,1 +1,2 @@
-export { PrismaStore, createPrismaClient } from './prisma-store';
+export { DrizzleStore, createDb, type Db } from './drizzle-store';
+export * from './schema';

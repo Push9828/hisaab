@@ -8,14 +8,14 @@ If code and spec disagree, stop and ask. Don't silently pick one.
 
 ## Stack
 
-TypeScript (strict), Node 22, pnpm workspaces, Prisma + Postgres, Vitest, fast-check,
+TypeScript (strict), Node 22, pnpm workspaces, Drizzle + Postgres, Vitest, fast-check,
 AWS Lambda (API Gateway), Next.js (App Router) for the dashboard.
 
 ## Layout
 
 ```
 packages/core        pure logic: money, parser, ledger rules, ingest(). NO I/O imports.
-packages/db          Prisma schema, migrations, repositories
+packages/db          Drizzle schema, migrations, stores
 apps/adapter         Lambda webhook handler (channel adapter) -> calls core.ingest
 apps/dashboard       Next.js, reads from db
 docs/                SPEC.md, design notes, blog drafts in docs/blog/
@@ -34,7 +34,8 @@ pnpm test:core       # fast loop, no DB
 pnpm test:db         # store contract + Postgres tests (needs pnpm --filter @hisaab/db db:up)
 pnpm typecheck
 pnpm lint
-pnpm db:migrate      # prisma migrate dev
+pnpm db:generate     # drizzle-kit generate (after editing schema.ts)
+pnpm db:migrate      # drizzle-kit migrate
 ```
 
 Run `pnpm typecheck && pnpm lint && pnpm test` before declaring any task done.

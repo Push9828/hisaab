@@ -1,106 +1,180 @@
-import { MemoryStore } from '@hisaab/core';
+import { ingest, MemoryStore } from '@hisaab/core';
+import { count, isNotNull, isNull, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createPrismaClient, PrismaStore } from '../src';
-import { storeContract } from './store-contract';
+import {
+  accounts,
+  createDb,
+  DrizzleStore,
+  entries,
+  transactions,
+} from '../src';
+import { meta, seed, storeContract, tx } from './store-contract';
+import { assertTestDatabaseUrl } from './test-db';
 
-const url = process.env.TEST_DATABASE_URL as string;
-const prisma = createPrismaClient(url);
-const store = new PrismaStore(prisma);
-
-// Never wipe a database that is not a test database.
-if (!/_test$/.test(new URL(url).pathname.slice(1))) {
-  throw new Error('TEST_DATABASE_URL must point at a database ending in _test');
-}
+const { db, pool } = createDb(
+  assertTestDatabaseUrl(process.env.TEST_DATABASE_URL).toString(),
+);
+const store = new DrizzleStore(db);
 
 beforeEach(async () => {
-  await prisma.$executeRaw`TRUNCATE "Entry", "Transaction", "Account", "ProcessedMessage" RESTART IDENTITY CASCADE`;
+  await db.execute(
+    sql`TRUNCATE "Entry", "Transaction", "Account", "ProcessedMessage" RESTART IDENTITY CASCADE`,
+  );
 });
-afterAll(() => prisma.$disconnect());
+afterAll(() => pool.end());
 
 storeContract('MemoryStore', () => Promise.resolve(new MemoryStore()));
-storeContract('PrismaStore', () => Promise.resolve(store));
+storeContract('DrizzleStore', () => Promise.resolve(store));
 
-describe('PrismaStore on Postgres', () => {
-  const insert = (type: string, spend: number, entry = 1) =>
-    prisma.$executeRawUnsafe(
-      `WITH a AS (INSERT INTO "Account"(id, alias, name, kind) VALUES ('a1','a','A','BANK') ON CONFLICT DO NOTHING)
-       , t AS (INSERT INTO "Transaction"(id, type, "occurredAt", description, "spendAmount", channel, "externalId", "rawText")
-               VALUES ('t1', '${type}', now(), 'x', ${spend}, 'c', '1', 'x'))
-       INSERT INTO "Entry"(id, "transactionId", "accountId", amount) VALUES ('e1', 't1', 'a1', ${entry})`,
-    );
+describe('DrizzleStore on Postgres', () => {
+  let n = 0;
+  const row = (
+    type: 'EXPENSE' | 'TRANSFER' | 'INCOME' | 'ADJUSTMENT' | 'SPLIT',
+    spendAmount: bigint,
+  ) => ({
+    type,
+    occurredAt: new Date(),
+    description: 'x',
+    spendAmount,
+    channel: 'c',
+    externalId: `r${++n}`,
+    rawText: 'x',
+  });
+
+  /** The name of the CHECK the insert violated, or undefined if it went through. */
+  const violated = async (insert: Promise<unknown>) => {
+    try {
+      await insert;
+    } catch (e) {
+      return (
+        (e as { cause?: { constraint?: string } }).cause?.constraint ??
+        'unknown error'
+      );
+    }
+    return undefined;
+  };
+
+  it('CHECKs accept valid rows (positive control)', async () => {
+    for (const [type, spend] of [
+      ['EXPENSE', 100n],
+      ['TRANSFER', 0n],
+      ['SPLIT', 100n],
+    ] as const) {
+      expect(
+        await violated(db.insert(transactions).values(row(type, spend))),
+      ).toBeUndefined();
+    }
+  });
 
   it.each([
-    ['TRANSFER with spend', 'TRANSFER', 100, 1],
-    ['negative spend', 'EXPENSE', -5, 1],
-    ['zero entry', 'EXPENSE', 100, 0],
-  ])('CHECK rejects %s', async (_name, type, spend, entry) => {
-    await expect(insert(type, spend, entry)).rejects.toThrow();
+    ['TRANSFER', 100n, 'Transaction_spendAmount_zero_for_non_spend'],
+    ['ADJUSTMENT', 100n, 'Transaction_spendAmount_zero_for_non_spend'],
+    ['INCOME', 100n, 'Transaction_spendAmount_zero_for_non_spend'],
+    ['EXPENSE', -5n, 'Transaction_spendAmount_nonneg'],
+  ] as const)(
+    'CHECK rejects %s with spend %s',
+    async (type, spend, constraint) => {
+      expect(
+        await violated(db.insert(transactions).values(row(type, spend))),
+      ).toBe(constraint);
+    },
+  );
+
+  it('CHECK rejects a zero entry', async () => {
+    const [a] = await db
+      .insert(accounts)
+      .values({ alias: 'a', name: 'A', kind: 'BANK' })
+      .returning({ id: accounts.id });
+    const [t] = await db
+      .insert(transactions)
+      .values(row('EXPENSE', 100n))
+      .returning({ id: transactions.id });
+    const bad = db.insert(entries).values({
+      transactionId: t?.id as string,
+      accountId: a?.id as string,
+      amount: 0n,
+    });
+    expect(await violated(bad)).toBe('Entry_amount_nonzero');
   });
 
   it('serialises concurrent undos: each voids a different row', async () => {
-    const n = 8;
-    await store.run((db) =>
-      db.createAccount({
-        alias: 'a',
-        name: 'A',
-        kind: 'BANK',
-        openingBalance: 0n,
-      }),
-    );
-    const [account] = await store.run((db) => db.accounts());
-    await store.run(async (db) => {
-      for (let i = 1; i <= n; i++) {
-        await db.insertTransaction(
-          {
-            type: 'EXPENSE',
-            occurredAt: new Date(),
-            description: `tx${i}`,
-            category: null,
-            spendAmount: 1n,
-            status: 'NEEDS_REVIEW',
-            entries: [{ accountId: account?.id as string, amount: -1n }],
-          },
-          { channel: 'test', externalId: `${i}`, rawText: 'x' },
-        );
+    const total = 8;
+    const a = await seed(store);
+    await store.run(async (txn) => {
+      for (let i = 1; i <= total; i++) {
+        await txn.insertTransaction(tx(a, `tx${i}`, 1n), meta(`${i}`));
       }
     });
     const voided = await Promise.all(
-      Array.from({ length: n }, () =>
-        store.run((db) => db.voidLatest(new Date())),
+      Array.from({ length: total }, () =>
+        store.run((txn) => txn.voidLatest(new Date())),
       ),
     );
-    expect(new Set(voided.map((v) => v?.description)).size).toBe(n);
+    expect(new Set(voided.map((v) => v?.description)).size).toBe(total);
   });
 
-  it('never deletes: a voided row is still in the table', async () => {
-    await store.run((db) =>
-      db.createAccount({
-        alias: 'a',
-        name: 'A',
-        kind: 'BANK',
-        openingBalance: 0n,
-      }),
+  it('never deletes: a voided row and its entries are still in the table', async () => {
+    const a = await seed(store);
+    await store.run((txn) =>
+      txn.insertTransaction(tx(a, 'one', 1n), meta('1')),
     );
-    const [account] = await store.run((db) => db.accounts());
-    await store.run((db) =>
-      db.insertTransaction(
-        {
-          type: 'EXPENSE',
-          occurredAt: new Date(),
-          description: 'one',
-          category: null,
-          spendAmount: 1n,
-          status: 'NEEDS_REVIEW',
-          entries: [{ accountId: account?.id as string, amount: -1n }],
-        },
-        { channel: 'test', externalId: '1', rawText: 'x' },
-      ),
+    await store.run((txn) => txn.voidLatest(new Date()));
+    const [voided] = await db
+      .select({ n: count() })
+      .from(transactions)
+      .where(isNotNull(transactions.voidedAt));
+    const [kept] = await db.select({ n: count() }).from(entries);
+    expect([voided?.n, kept?.n]).toEqual([1, 1]);
+  });
+});
+
+describe('ingest() through DrizzleStore', () => {
+  const send = (text: string, externalId: string) =>
+    ingest({ channel: 'test', externalId, text, now: new Date() }, store);
+  const balances = async () =>
+    Object.fromEntries(
+      (await store.run((txn) => txn.accounts())).map((a) => [
+        a.alias,
+        a.balance,
+      ]),
     );
-    await store.run((db) => db.voidLatest(new Date()));
-    expect(
-      await prisma.transaction.count({ where: { voidedAt: { not: null } } }),
-    ).toBe(1);
-    expect(await prisma.entry.count()).toBe(1);
+  const spend = async () =>
+    (
+      await db
+        .select({ s: transactions.spendAmount })
+        .from(transactions)
+        .where(isNull(transactions.voidedAt))
+    ).reduce((sum, r) => sum + r.s, 0n);
+
+  beforeEach(async () => {
+    await send('open icici 84200 bank', 'o1');
+    await send('open icicicc 1500 cc', 'o2');
+  });
+
+  it('card bill payment moves money and adds no spend', async () => {
+    await send('pay icicicc 4k from icici', 'p1');
+    expect(await balances()).toEqual({
+      icici: 8_020_000n,
+      icicicc: -150_000n + 400_000n,
+    });
+    expect(await spend()).toBe(0n);
+  });
+
+  it('a replayed undo does not void a second transaction', async () => {
+    await send('lunch 100 icici', 'a');
+    await send('dinner 200 icici', 'b');
+    await send('undo', 'u');
+    expect((await send('undo', 'u')).duplicate).toBe(true);
+    expect(await spend()).toBe(10_000n);
+  });
+
+  it('two concurrent deliveries of one message write once', async () => {
+    const outs = await Promise.all([
+      send('petrol 4k icici', 'r'),
+      send('petrol 4k icici', 'r'),
+    ]);
+    expect(outs.map((o) => o.duplicate).sort()).toEqual([false, true]);
+    expect(await spend()).toBe(400_000n);
   });
 });

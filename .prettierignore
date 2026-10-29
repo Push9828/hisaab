@@ -3,7 +3,6 @@ pnpm-lock.yaml
 dist
 .next
 coverage
-packages/db/src/generated
-packages/db/prisma/migrations
+packages/db/drizzle
 *.md
 .claude

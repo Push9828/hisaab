@@ -5,13 +5,13 @@ import type { LedgerStore, ProposedTx } from '@hisaab/core';
 // What every LedgerStore must do. Run against MemoryStore and PrismaStore so
 // the test double cannot drift from production. Fake data only.
 
-const meta = (externalId: string) => ({
+export const meta = (externalId: string) => ({
   channel: 'test',
   externalId,
   rawText: 'lunch 100 a',
 });
 
-const tx = (
+export const tx = (
   accountId: string,
   description: string,
   amount: bigint,
@@ -26,7 +26,7 @@ const tx = (
 });
 
 /** Opens account "a" with 1,000 paise and returns its id. */
-async function seed(store: LedgerStore, openingBalance = 1_000n) {
+export async function seed(store: LedgerStore, openingBalance = 1_000n) {
   await store.run((db) =>
     db.createAccount({ alias: 'a', name: 'A', kind: 'BANK', openingBalance }),
   );
