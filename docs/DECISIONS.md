@@ -117,3 +117,34 @@ Why: a second line of defence for hard rule 3. Cross-row rules (transfer sums, s
 **Entry foreign keys are `onDelete: Restrict`.** Why: nothing is hard-deleted (hard rule 4).
 
 **Open for step 6: serialise concurrent `run()` calls (advisory lock, matching `MemoryStore`) so two undos cannot pick the same row.**
+
+## 2026-10-29 (M2: Prisma replaced by Drizzle)
+
+**Prisma 7.10.1 is replaced by Drizzle (`drizzle-orm` 0.45.4, `drizzle-kit` 0.31.11, pinned exactly). The 1.0 release candidate is skipped.**
+Why: no generated client folder (a fresh clone could not typecheck), CHECK constraints live in the
+schema instead of hand-edited migration SQL, and our hot paths (advisory lock, grouped sum,
+`ON CONFLICT DO NOTHING`) are SQL-shaped. We use almost none of the 1.0 surface, so the release
+candidate buys nothing. Revisit at 1.0 stable. This supersedes the Prisma pin and the "hand-written
+CHECKs in the init migration" decision above; the CHECKs keep their names and now live in `schema.ts`.
+`LedgerStore` and its shared contract suite did not change, which is what made the swap cheap.
+
+**Ids are `crypto.randomUUID()` text, and timestamps are `timestamptz`.**
+Why: no new dependency for ids. A bare `timestamp` is read in the process timezone by `pg`, which
+would differ between a laptop and Lambda. `occurredAt` is an instant. Nothing was deployed, so the
+change was free. Account list order stays `createdAt`, then `id`: each `open` is its own transaction
+under the run lock, so ties do not happen in practice.
+
+**Pool `statement_timeout` is 30s. Drizzle has no per-transaction timeout.**
+Why: time spent waiting on the advisory lock must not be cut off by a short default, but a stuck
+statement should not block forever.
+
+**Never enable Drizzle's `logger` option.** Why: it prints query parameters, which include message
+bodies (hard rule 8).
+
+**M3: the adapter must handle a lost reply on a replayed id.**
+Why: if a delivery commits but the reply to the user is lost, the retry returns `duplicate: true`
+and `core` does not reproduce the original reply. The adapter decides what to tell the user, for
+example a short "already processed" message, rather than staying silent.
+
+**Local databases from the Prisma era must be dropped** (`db:down -v`, and `DROP DATABASE hisaab_test`)
+because they hold Prisma's migration table. They held no real data.
