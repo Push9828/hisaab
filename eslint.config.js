@@ -65,6 +65,7 @@ export default config(
                 'drizzle-orm/*',
                 'drizzle-kit',
                 'pg',
+                'pg/*',
                 'axios',
                 'undici',
                 'node:fs',

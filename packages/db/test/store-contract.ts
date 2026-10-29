@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { LedgerStore, ProposedTx } from '@hisaab/core';
 
-// What every LedgerStore must do. Run against MemoryStore and PrismaStore so
+// What every LedgerStore must do. Run against MemoryStore and DrizzleStore so
 // the test double cannot drift from production. Fake data only.
 
 export const meta = (externalId: string) => ({

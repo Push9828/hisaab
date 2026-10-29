@@ -234,6 +234,9 @@ enum TxType { INCOME EXPENSE TRANSFER SPLIT ADJUSTMENT }
 enum TxStatus { CONFIRMED NEEDS_REVIEW }
 ```
 
+Where the sketch and `schema.ts` differ (UUID text ids, `timestamptz`, the CHECK constraints,
+identity `seq`), `schema.ts` is the truth.
+
 ## 9. Security (non-negotiable even for a personal tool)
 
 - Verify the webhook secret (Telegram: `X-Telegram-Bot-Api-Secret-Token`, constant-time compare). Reject on mismatch.

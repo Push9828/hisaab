@@ -29,7 +29,7 @@ compiler API; a new one is expected in 7.1. Revisit when typescript-eslint suppo
 No other installed package declares a TS peer range that blocks 7. Our tsconfig already typechecked
 under 7.0.2; when upgrading, add `"types": ["node"]` where Node types are needed (TS 7 defaults `types` to `[]`).
 
-**Prisma pinned to 7.10.1 (CLI and client), not `latest`.**
+**Prisma pinned to 7.10.1 (CLI and client), not `latest`.** *(Superseded 2026-10-29: Prisma was replaced by Drizzle.)*
 Why: the npm `latest` tag is 8.0.0-rc, a release candidate. Prisma 7 keeps the datasource URL in
 `packages/db/prisma.config.ts`, not in `schema.prisma`. M0 schema has no models.
 
@@ -40,7 +40,7 @@ blank line between groups. Prettier ignores `*.md` and `.claude/` so spec and ag
 **ESLint blocks db, adapter, AWS, prisma, network and fs imports inside `packages/core`.**
 Why: enforces the "core is pure" layout rule mechanically.
 
-**pnpm build scripts approved only for prisma, @prisma/*, esbuild, unrs-resolver; workerd denied.**
+**pnpm build scripts approved only for prisma, @prisma/*, esbuild, unrs-resolver; workerd denied.** *(Now esbuild and unrs-resolver only.)*
 Why: pnpm 12 blocks install scripts by default. workerd arrives transitively via the Prisma CLI and is not needed.
 
 **Vitest root config lists projects explicitly (`packages/core` only for now).**
@@ -102,7 +102,7 @@ are not transactions. Nothing to void replies "Nothing to undo." and writes noth
 
 **`ingest` talks to storage only through `LedgerStore.run(fn)`, one atomic unit per message.**
 Why: keeps `core` free of `db` imports and satisfies "read and write in the same DB transaction".
-`MemoryStore` (tests) and `PrismaStore` (production) share one contract test suite.
+`MemoryStore` (tests) and `DrizzleStore` (production; it was `PrismaStore` until 2026-10-29) share one contract test suite.
 
 ## 2026-10-29 (M2 step 5)
 

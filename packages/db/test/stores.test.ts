@@ -59,6 +59,7 @@ describe('DrizzleStore on Postgres', () => {
     for (const [type, spend] of [
       ['EXPENSE', 100n],
       ['TRANSFER', 0n],
+      ['INCOME', 0n],
       ['SPLIT', 100n],
     ] as const) {
       expect(
@@ -112,6 +113,16 @@ describe('DrizzleStore on Postgres', () => {
       ),
     );
     expect(new Set(voided.map((v) => v?.description)).size).toBe(total);
+  });
+
+  it('FK restrict: a transaction that has entries cannot be deleted', async () => {
+    const a = await seed(store);
+    await store.run((txn) =>
+      txn.insertTransaction(tx(a, 'one', 1n), meta('1')),
+    );
+    expect(await violated(db.delete(transactions))).toBe(
+      'Entry_transactionId_Transaction_id_fk',
+    );
   });
 
   it('never deletes: a voided row and its entries are still in the table', async () => {
