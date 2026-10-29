@@ -79,7 +79,7 @@ receivable; revisit if it causes confusion.
 Why: losing the entry is worse than a missing label. Ambiguity about amount, account or type is
 different: that writes nothing.
 
-**Open for M2: `undo` and `bal <x> <amount>` must read the last transaction / current balance in
+**Resolved in M2 (see below): `undo` and `bal <x> <amount>` must read the last transaction / current balance in
 the same DB transaction as the write; undo targets (adjustments, already-voided rows) are decided in the M2 plan.**
 
 ## 2026-10-28 (M2 plan)
@@ -116,7 +116,7 @@ Why: a second line of defence for hard rule 3. Cross-row rules (transfer sums, s
 
 **Entry foreign keys are `onDelete: Restrict`.** Why: nothing is hard-deleted (hard rule 4).
 
-**Open for step 6: serialise concurrent `run()` calls (advisory lock, matching `MemoryStore`) so two undos cannot pick the same row.**
+**Resolved in step 6: every `run()` takes a Postgres advisory lock first, matching `MemoryStore`'s queue, so two undos cannot pick the same row.**
 
 ## 2026-10-29 (M2: Prisma replaced by Drizzle)
 
@@ -148,3 +148,10 @@ example a short "already processed" message, rather than staying silent.
 
 **Local databases from the Prisma era must be dropped** (`db:down -v`, and `DROP DATABASE hisaab_test`)
 because they hold Prisma's migration table. They held no real data.
+
+## 2026-10-29 (M2 complete)
+
+**M2 is done: `ingest()` with persistence, idempotency, undo and reconcile, on `MemoryStore` and Postgres (`DrizzleStore`).**
+Why recorded: the temporary step plan (`docs/M2-PLAN.md`) is deleted; the decisions it carried are in the
+entries above. Both stores pass one shared contract suite, and the SPEC section 5 examples run end to end.
+Open for M3: the adapter's handling of a lost reply on a replayed id (see above).
