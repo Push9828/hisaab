@@ -12,9 +12,13 @@
     "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"
   },
   "devDependencies": {
+    "@types/pg": "^8.23.1",
     "prisma": "7.10.1"
   },
   "dependencies": {
-    "@prisma/client": "^7.10.1"
+    "@hisaab/core": "workspace:*",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "pg": "^8.23.1"
   }
 }
