@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:core": "vitest run --project @hisaab/core",
+    "test:db": "vitest run --project @hisaab/db",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

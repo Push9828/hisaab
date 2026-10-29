@@ -31,6 +31,7 @@ It receives repositories via interfaces. This keeps it testable and the channel 
 pnpm install
 pnpm test            # vitest, all packages
 pnpm test:core       # fast loop, no DB
+pnpm test:db         # store contract + Postgres tests (needs pnpm --filter @hisaab/db db:up)
 pnpm typecheck
 pnpm lint
 pnpm db:migrate      # prisma migrate dev
