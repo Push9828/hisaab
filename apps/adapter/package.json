@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx --env-file=.env src/local.ts",
     "webhook:set": "tsx --env-file=.env scripts/set-webhook.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "build": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=cjs --external:pg-native --outfile=dist/lambda.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "3.1150.0",
@@ -15,6 +16,7 @@
     "@hisaab/db": "workspace:*"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "tsx": "4.23.15"
   }
 }
