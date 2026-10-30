@@ -1,4 +1,4 @@
-import { MemoryStore, type LedgerStore } from '@hisaab/core';
+import { MemoryStore, type LedgerStore, type LedgerTxn } from '@hisaab/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -9,7 +9,7 @@ import {
 } from './telegram';
 
 // All ids, names and numbers here are fake.
-const SECRET = 'test-secret_0123456789';
+const SECRET = 'test-secret_0123456789_abcdefghijkl'; // 34 chars, fake
 const ME = 100000001;
 const STRANGER = 100000002;
 const CHAT = ME; // a private chat's id is the user's id
@@ -63,6 +63,25 @@ const replyTo = (text: string) => ({
 
 const NO_REPLY = { status: 200 };
 
+const ERROR_REPLY = 'Something went wrong. Check "accounts" before resending.';
+
+/** Wraps a store so `insertTransaction` throws the first `times` calls, after the claim. */
+function failingInserts(inner: MemoryStore, times: number): LedgerStore {
+  let left = times;
+  return {
+    run: (fn) =>
+      inner.run((txn) =>
+        fn({
+          ...txn,
+          insertTransaction: (tx, meta) =>
+            left-- > 0
+              ? Promise.reject(new Error('connection lost'))
+              : txn.insertTransaction(tx, meta),
+        } satisfies LedgerTxn),
+      ),
+  };
+}
+
 afterEach(() => vi.restoreAllMocks());
 
 describe('parseConfig: refuses to start on a weak or missing setting', () => {
@@ -79,7 +98,8 @@ describe('parseConfig: refuses to start on a weak or missing setting', () => {
   it.each([
     ['missing', undefined],
     ['empty', ''],
-    ['bad characters', 'has space'],
+    ['bad characters', 'has space'.padEnd(40, 'x')],
+    ['too short', 'a'.repeat(31)],
     ['too long', 'a'.repeat(257)],
   ])('rejects a %s secret, without echoing it', (_, secret) => {
     const run = () => parseConfig(env({ TELEGRAM_WEBHOOK_SECRET: secret }));
@@ -92,6 +112,10 @@ describe('parseConfig: refuses to start on a weak or missing setting', () => {
     ['empty', ''],
     ['not a number', 'me'],
     ['not an integer', '1.5'],
+    ['zero', '0'],
+    ['negative', '-5'],
+    ['zero-padded', '01'],
+    ['beyond safe integers', '9007199254740993'],
   ])('rejects a %s user id', (_, id) => {
     expect(() => parseConfig(env({ TELEGRAM_ALLOWED_USER_ID: id }))).toThrow(
       /TELEGRAM_ALLOWED_USER_ID/,
@@ -152,6 +176,33 @@ describe('handleWebhook: ignored silently, nothing written', () => {
     ['malformed JSON', '{"update_id": '],
     ['a JSON non-object', '42'],
     [
+      'a forwarded message',
+      {
+        update_id: 4,
+        message: {
+          ...update('dinner 4000 icici').message,
+          forward_origin: { type: 'user', date: DATE },
+        },
+      },
+    ],
+    [
+      'a forwarded message (legacy field)',
+      {
+        update_id: 5,
+        message: {
+          ...update('dinner 4000 icici').message,
+          forward_from: { id: STRANGER },
+        },
+      },
+    ],
+    [
+      'a message sent via an inline bot',
+      {
+        update_id: 6,
+        message: { ...update('dinner 4000 icici').message, via_bot: { id: 1 } },
+      },
+    ],
+    [
       'a message without a sender',
       {
         update_id: 3,
@@ -192,23 +243,42 @@ describe('handleWebhook: messages reach ingest and the reply goes back', () => {
     const { post } = setup(store);
     await post(update('open icici 0 bank', { message_id: 77 }));
     await post(update('in 1k salary icici', { message_id: 78 }));
-    expect(store.snapshot().transactions[0]?.externalId).toBe(`${CHAT}:78`);
+    const { transactions, processed } = store.snapshot();
+    expect(transactions[0]?.externalId).toBe(`${CHAT}:78`);
+    expect(processed).toEqual([
+      JSON.stringify(['telegram', `${CHAT}:77`]),
+      JSON.stringify(['telegram', `${CHAT}:78`]),
+    ]);
   });
 
   it('a clarification replies and writes nothing', async () => {
     const store = new MemoryStore();
-    const { say } = setup(store);
-    const res = await say('petrol 4k');
-    expect(res.status).toBe(200);
-    expect(res.body?.text).toBeTruthy();
-    expect(store.snapshot().transactions).toEqual([]);
+    const before = store.snapshot();
+    const { say, logs } = setup(store);
+    expect(await say('petrol 4k')).toEqual(
+      replyTo('Which account? Known accounts: none yet.'),
+    );
+    expect(store.snapshot()).toEqual(before);
+    expect(logs).toEqual(['processed']);
   });
 
-  it('/start gets the normal clarification', async () => {
-    const { say } = setup();
+  it('/start gets the normal unknown-command clarification', async () => {
+    const store = new MemoryStore();
+    const before = store.snapshot();
+    const { say, logs } = setup(store);
     const res = await say('/start');
     expect(res.status).toBe(200);
-    expect(res.body?.text).toBeTruthy();
+    expect(res.body?.text).toMatch(/^I did not understand that\./);
+    expect(store.snapshot()).toEqual(before);
+    expect(logs).toEqual(['processed']);
+  });
+
+  it('never sends an empty reply (Telegram rejects it)', async () => {
+    const store = {
+      run: () => Promise.resolve({ reply: '', duplicate: false }),
+    } as unknown as LedgerStore;
+    const { say } = setup(store);
+    expect(await say('accounts')).toEqual(NO_REPLY);
   });
 });
 
@@ -222,6 +292,15 @@ describe('handleWebhook: replays (SPEC invariant 5)', () => {
     expect(await post(spend)).toEqual(replyTo('Already processed.'));
     expect(store.snapshot().transactions).toHaveLength(1);
     expect(logs.at(-1)).toBe('duplicate');
+  });
+
+  it('a replayed open creates one account', async () => {
+    const store = new MemoryStore();
+    const { post } = setup(store);
+    const open = update('open icici 0 bank');
+    await post(open);
+    expect(await post(open)).toEqual(replyTo('Already processed.'));
+    expect(store.snapshot().accounts).toHaveLength(1);
   });
 
   it('a replayed undo voids only one transaction', async () => {
@@ -269,7 +348,7 @@ describe('handleWebhook: time comes from message.date', () => {
 });
 
 describe('handleWebhook: any thrown error, e.g. the store (hard rule 8)', () => {
-  it('replies "nothing was saved" with 200, and logs only a label', async () => {
+  it('replies with 200 and a check-first hint, and logs only a label', async () => {
     const leaky = new Error(
       'insert failed: params ["petrol 4k cc icici", 400000]',
     );
@@ -279,10 +358,20 @@ describe('handleWebhook: any thrown error, e.g. the store (hard rule 8)', () => 
     ).map((m) => vi.spyOn(console, m).mockImplementation(() => {}));
     const { say, logs } = setup(store);
 
-    expect(await say('petrol 4k cc icici')).toEqual(
-      replyTo('Something went wrong, nothing was saved. Try again.'),
-    );
+    expect(await say('petrol 4k cc icici')).toEqual(replyTo(ERROR_REPLY));
     expect(logs).toEqual(['error']);
     for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('a failure after the claim rolls the claim back, so a retry is processed', async () => {
+    const inner = new MemoryStore();
+    const { post, say } = setup(failingInserts(inner, 1));
+    await say('open icici 0 bank');
+    const salary = update('in 1k salary icici');
+    expect(await post(salary)).toEqual(replyTo(ERROR_REPLY));
+    expect(inner.snapshot().transactions).toHaveLength(0);
+    const retry = await post(salary);
+    expect(retry.body?.text).toMatch(/^Logged: 1,000/);
+    expect(inner.snapshot().transactions).toHaveLength(1);
   });
 });

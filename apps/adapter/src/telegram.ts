@@ -46,8 +46,19 @@ interface TextMessage {
 }
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token';
-const SECRET_FORMAT = /^[A-Za-z0-9_-]{1,256}$/;
-const ERROR_REPLY = 'Something went wrong, nothing was saved. Try again.';
+const SECRET_FORMAT = /^[A-Za-z0-9_-]{32,256}$/;
+/**
+ * Not "nothing was saved": if the connection drops during COMMIT the write
+ * may have landed, and a blind resend (a new message id) would double it.
+ */
+const ERROR_REPLY = 'Something went wrong. Check "accounts" before resending.';
+/** Text someone else wrote. Ingesting it would act on their words, not mine. */
+const NOT_MINE = [
+  'forward_origin',
+  'forward_from',
+  'forward_from_chat',
+  'via_bot',
+];
 
 /** Reads adapter settings from the environment. Throws (without echoing values) if any is unsafe. */
 export function parseConfig(
@@ -56,7 +67,7 @@ export function parseConfig(
   const secret = env.TELEGRAM_WEBHOOK_SECRET;
   if (!secret || !SECRET_FORMAT.test(secret)) {
     throw new Error(
-      'TELEGRAM_WEBHOOK_SECRET must be 1-256 characters of A-Z a-z 0-9 _ -',
+      'TELEGRAM_WEBHOOK_SECRET must be 32-256 characters of A-Z a-z 0-9 _ -',
     );
   }
   const id = env.TELEGRAM_ALLOWED_USER_ID ?? '';
@@ -78,7 +89,7 @@ export async function handleWebhook(
   req: WebhookRequest,
   { config, store, log }: WebhookDeps,
 ): Promise<WebhookResponse> {
-  if (!secretMatches(req.headers[SECRET_HEADER], config.secret)) {
+  if (!hasValidSecret(req.headers, config.secret)) {
     log('unauthorized');
     return { status: 401 };
   }
@@ -109,26 +120,34 @@ export async function handleWebhook(
       store,
     );
     log(result.duplicate ? 'duplicate' : 'processed');
-    return send(result.reply);
+    // Telegram rejects an empty sendMessage; send nothing instead.
+    return result.reply ? send(result.reply) : { status: 200 };
   } catch {
     // The error may carry query parameters, i.e. the message text. Never log it.
-    // The run rolled back, so resending is safe.
     log('error');
     return send(ERROR_REPLY);
   }
 }
 
-function secretMatches(
-  header: string | string[] | undefined,
+/**
+ * Constant-time check of Telegram's secret header. Exported so the HTTP layer
+ * can reject before reading the body.
+ */
+export function hasValidSecret(
+  headers: WebhookRequest['headers'],
   secret: string,
 ): boolean {
+  const header = headers[SECRET_HEADER];
   if (typeof header !== 'string') return false;
   // Hashing gives equal lengths, which timingSafeEqual requires.
   const digest = (s: string) => createHash('sha256').update(s).digest();
   return timingSafeEqual(digest(header), digest(secret));
 }
 
-/** `update.message` if it is a text message we can process, else null. Edits are not `message`. */
+/**
+ * `update.message` if it is my own text message, else null. Edits are not
+ * `message`; forwards and inline-bot messages are not mine.
+ */
 function textMessage(body: string): TextMessage | null {
   let update: unknown;
   try {
@@ -137,7 +156,9 @@ function textMessage(body: string): TextMessage | null {
     return null;
   }
   if (!isObject(update) || !isObject(update.message)) return null;
-  const { message_id, date, chat, from, text } = update.message;
+  const message = update.message;
+  if (NOT_MINE.some((field) => message[field] !== undefined)) return null;
+  const { message_id, date, chat, from, text } = message;
   if (
     !Number.isSafeInteger(message_id) ||
     !Number.isSafeInteger(date) ||

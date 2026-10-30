@@ -1,8 +1,17 @@
-import { createServer, type IncomingMessage } from 'node:http';
+import {
+  createServer,
+  type IncomingMessage,
+  type ServerResponse,
+} from 'node:http';
 
 import { createDb, DrizzleStore } from '@hisaab/db';
 
-import { handleWebhook, parseConfig, type LogLabel } from './telegram';
+import {
+  handleWebhook,
+  hasValidSecret,
+  parseConfig,
+  type LogLabel,
+} from './telegram';
 
 /**
  * Local webhook server for M3, run behind a tunnel. Listens on 127.0.0.1
@@ -18,8 +27,30 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
 
 const { db, pool } = createDb(process.env.DATABASE_URL);
 const store = new DrizzleStore(db);
-const log = (label: LogLabel | 'bad_request') =>
+const log = (label: LogLabel | 'bad_request' | 'aborted') =>
   console.log(`${new Date().toISOString()} ${label}`);
+
+// A dropped idle connection emits 'error' on the pool; unhandled, it would
+// crash with a stack trace.
+pool.on('error', () => log('error'));
+
+try {
+  await pool.query('select 1');
+} catch {
+  // The pg error can include connection details. Print a fixed line only.
+  console.error('database unreachable: check DATABASE_URL and pnpm db:up');
+  process.exit(1);
+}
+
+// From here on, anything unexpected prints a label, never a stack trace.
+process.on('uncaughtException', () => {
+  log('error');
+  process.exit(1);
+});
+process.on('unhandledRejection', () => {
+  log('error');
+  process.exit(1);
+});
 
 class TooLarge extends Error {}
 
@@ -34,43 +65,74 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-const server = createServer((req, res) => {
-  const finish = (status: number, body?: unknown) => {
-    if (body === undefined) {
-      res.writeHead(status).end();
-    } else {
-      res
-        .writeHead(status, { 'content-type': 'application/json' })
-        .end(JSON.stringify(body));
-    }
-  };
+/** Answers without reading the body, and closes the connection after. */
+function reject(res: ServerResponse, status: number) {
+  res.writeHead(status, { connection: 'close' }).end();
+}
 
+async function handle(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST' || req.url !== '/') {
     log('bad_request');
-    finish(req.method === 'POST' ? 404 : 405);
+    reject(res, req.method === 'POST' ? 404 : 405);
+    return;
+  }
+  // Checked again in handleWebhook; here it stops strangers before we read a byte.
+  if (!hasValidSecret(req.headers, config.secret)) {
+    log('unauthorized');
+    reject(res, 401);
     return;
   }
 
-  readBody(req)
-    .then((body) =>
-      handleWebhook({ headers: req.headers, body }, { config, store, log }),
-    )
-    .then(({ status, body }) => finish(status, body))
-    .catch((err: unknown) => {
-      // Never log err: it may hold the request body.
-      log(err instanceof TooLarge ? 'bad_request' : 'error');
-      finish(err instanceof TooLarge ? 413 : 500);
-      if (err instanceof TooLarge) req.destroy();
+  let body: string;
+  try {
+    body = await readBody(req);
+  } catch (err) {
+    if (err instanceof TooLarge) {
+      log('bad_request');
+      reject(res, 413);
+    } else {
+      log('aborted'); // the client went away mid-body; nobody to answer
+    }
+    return;
+  }
+
+  const { status, body: reply } = await handleWebhook(
+    { headers: req.headers, body },
+    { config, store, log },
+  );
+  if (reply === undefined) {
+    res.writeHead(status).end();
+  } else {
+    res
+      .writeHead(status, { 'content-type': 'application/json' })
+      .end(JSON.stringify(reply));
+  }
+}
+
+// Node only checks the timeouts below every connectionsCheckingInterval
+// (default 30s), so check often enough for them to mean what they say.
+const server = createServer(
+  { connectionsCheckingInterval: 1_000 },
+  (req, res) => {
+    handle(req, res).catch(() => {
+      // Never log the error: it may hold the request body.
+      log('error');
+      if (!res.headersSent) reject(res, 500);
     });
-});
+  },
+);
+// Telegram sends small bodies quickly; slow senders are cut off.
+server.headersTimeout = 5_000;
+server.requestTimeout = 10_000;
+server.maxConnections = 50;
 
 server.listen(port, HOST, () => {
   console.log(`listening on http://${HOST}:${port}`);
 });
 
 const shutdown = () => {
-  server.close();
-  void pool.end();
+  // Let in-flight requests finish before the pool goes away.
+  server.close(() => void pool.end());
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

@@ -29,6 +29,9 @@ try {
       secret_token: secret,
       // Edits and everything else are never delivered.
       allowed_updates: ['message'],
+      // One delivery at a time, so messages are processed in the order sent.
+      // With Telegram's default (40) a quick "undo" could run before the entry it targets.
+      max_connections: 1,
     }),
   });
 } catch {

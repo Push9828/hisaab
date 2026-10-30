@@ -1,5 +1,6 @@
 export {
   handleWebhook,
+  hasValidSecret,
   parseConfig,
   type LogLabel,
   type WebhookConfig,
