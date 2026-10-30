@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "3.1150.0",
     "@hisaab/core": "workspace:*",
     "@hisaab/db": "workspace:*"
   },

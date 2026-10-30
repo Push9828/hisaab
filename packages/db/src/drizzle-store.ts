@@ -29,6 +29,9 @@ const RUN_LOCK_KEY = 7_240_001;
  */
 const STATEMENT_TIMEOUT_MS = 30_000;
 
+/** pg's default (0) waits forever for a connection, e.g. to an unreachable host. */
+const CONNECT_TIMEOUT_MS = 5_000;
+
 /**
  * The caller owns `pool.end()`. Never pass Drizzle a `logger`: it prints query
  * parameters, which include message bodies (hard rule 8).
@@ -37,6 +40,7 @@ export function createDb(connectionString: string): { db: Db; pool: pg.Pool } {
   const pool = new pg.Pool({
     connectionString,
     statement_timeout: STATEMENT_TIMEOUT_MS,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
   });
   return { db: drizzle(pool), pool };
 }
