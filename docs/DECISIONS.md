@@ -173,14 +173,17 @@ Why: it stays the same across retries, and a late delivery still gets the right 
 
 **The webhook secret is verified from M3, not M4.** SPEC M4 row reworded.
 Why: the tunnel URL is public, and hard rule 10 applies from the first request. The adapter refuses to start if
-the secret is empty or not 1-256 chars of `[A-Za-z0-9_-]`, or if the allowed user id is missing. Both sides are
+the secret is not 32-256 chars of `[A-Za-z0-9_-]` (32 minimum after review: it is the only gate on a public URL), or if the allowed user id is missing. Both sides are
 SHA-256 hashed before `timingSafeEqual`, which throws on unequal lengths.
 
-**Any error thrown while processing (store failure, or a bug such as a failed invariant check) is logged as `error` and replies 200 "Something went wrong, nothing was saved. Try again." instead of returning 500.**
-Why: the DB transaction rolls back, so nothing is half-written and resending is safe. A 500 makes Telegram retry
-a message that may fail every time, for hours, holding up later messages.
+**Any error thrown while processing (store failure, or a bug such as a failed invariant check) is logged as `error` and replies 200 `Something went wrong. Check "accounts" before resending.` instead of returning 500.**
+Why: a 500 makes Telegram retry a message that may fail every time, for hours, holding up later messages. The
+reply does not promise "nothing was saved": the run normally rolls back, but if the connection drops during
+COMMIT the write may have landed, and a blind resend (a new message id) would double it. (Changed after review.)
 
-**Ignored silently (200, no reply, no write): wrong sender, non-private chat, `edited_message`, non-text, malformed JSON.**
+**Ignored silently (200, no reply, no write): wrong sender, non-private chat, `edited_message`, non-text, malformed JSON,
+forwarded messages (`forward_origin`, `forward_from`, `forward_from_chat`) and inline-bot messages (`via_bot`).**
+Why for forwards: `from.id` is still mine, but the words are someone else's (hard rule 7).
 Edits are also excluded by `allowed_updates: ["message"]`. `/start` gets the normal unknown-command clarification.
 
 **Adapter logs are fixed labels only, never an error object.** Why: Drizzle and pg errors carry query
@@ -188,3 +191,28 @@ parameters, which include `rawText` (hard rule 8).
 
 **The adapter runs TypeScript with `tsx` 4.23.15 (pinned).** Why: Node's built-in type stripping needs file
 extensions in imports, and the workspace uses extensionless imports. `tsx --env-file` also means no dotenv.
+
+## 2026-10-30 (M3 complete)
+
+**M3 is verified end to end from the phone:** Telegram -> cloudflared quick tunnel -> `local.ts` -> `handleWebhook`
+-> `ingest` -> Postgres, with the reply returned in the webhook response. The SPEC section 5 examples were run
+with fake aliases (checklist in `apps/adapter/README.md`). The temporary step plan is deleted; its decisions are above.
+
+**An empty `accounts`/`bal` reply now says "No accounts yet. Add one: open <alias> <amount> <kind>".**
+Why: found in the M3 smoke test. Telegram rejects a `sendMessage` with empty text, so the user saw nothing.
+
+**Test rows are wiped before real use, by dropping the local dev database.** Why: accounts cannot be voided,
+so fake test accounts would otherwise stay in the account list.
+
+**The tunnel is cloudflared with `--protocol http2`.** Why: no signup. Its "critical failures" pre-check can be
+caused by a VPN kill switch (ProtonVPN here) rather than the network. Its TLS ends at Cloudflare, so real
+messages and balance replies are readable by Cloudflare. M4 removes this extra hop; TLS will then end at AWS API Gateway.
+
+**Telegram delivers one update at a time (`max_connections: 1` in `setWebhook`).**
+Why: with the default of 40 parallel deliveries, the run lock serialises messages but not in order, so a quick
+`undo` could void the entry before the one it was meant for, and `bal` could reconcile against a stale balance.
+One connection is plenty for a single user.
+
+**The local server checks the secret before reading the body, and has short timeouts** (5s headers, 10s request,
+checked every second, 50 connections). Why: the tunnel URL is public; strangers must not hold connections open.
+A pool `error` listener, a startup `select 1`, and uncaught-error handlers print labels only, never a stack trace.
