@@ -76,6 +76,16 @@ describe('reply', () => {
     );
   });
 
+  it('never replies with empty text when there are no accounts', () => {
+    // Telegram rejects an empty sendMessage, so the user would see nothing.
+    const empty = ctx([]);
+    for (const text of ['accounts', 'bal']) {
+      expect(reply(interpret(text, empty), empty)).toBe(
+        'No accounts yet. Add one: open <alias> <amount> <kind>',
+      );
+    }
+  });
+
   it('confirms an opened account', () => {
     expect(say('open hdfc 50000 bank')).toBe(
       'Opened HDFC (BANK) with balance 50,000.',

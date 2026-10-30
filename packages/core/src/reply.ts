@@ -28,6 +28,10 @@ export function reply(result: Result, ctx: Context): string {
       )}.`;
 
     case 'balances':
+      // Never empty: Telegram rejects a message with no text.
+      if (result.accountIds.length === 0) {
+        return 'No accounts yet. Add one: open <alias> <amount> <kind>';
+      }
       return result.accountIds
         .map((id) => {
           const account = ctx.accounts.find((a) => a.id === id);
