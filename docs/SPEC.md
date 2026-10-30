@@ -154,11 +154,11 @@ Telegram bot
         |  webhook (HTTPS)
         v
 API Gateway -> Lambda: channel adapter
-        |  verify signature, allowlist sender, dedupe by message id
+        |  verify secret token, allowlist sender, build key (chat.id:message_id)
         v
-packages/core: ingest(text, sender) -> parse -> validate -> ledger write
-        |                                   |
-        |                                   +--> categorizer (rules, LLM fallback)
+packages/core: ingest(message, store) -> dedupe (claim key) -> parse -> validate -> ledger write
+        |                                                        |
+        |                                                        +--> categorizer (rules, LLM fallback)
         v
 Postgres (Neon or Supabase free tier) via Drizzle
         ^
