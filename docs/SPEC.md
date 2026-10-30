@@ -122,7 +122,7 @@ undo                                               void the latest non-voided tr
   `on 20 oct`, `on 20 oct 2025`. Month names are 3-letter or full. The year defaults to the
   current IST year; a date in the future is rejected, never rolled back a year. An explicit
   year must be 20xx. Backdated entries are stamped 12:00 IST; undated entries use the
-  receive time. Time is IST (UTC+5:30, fixed).
+  receive time (for Telegram, `message.date`: when Telegram received it). Time is IST (UTC+5:30, fixed).
 - Credit cards, payables and loans: a stated amount (`open`, `bal`) means the amount owed and
   is stored as a negative balance. A stated bank balance cannot be negative, but spending and
   transfers can still overdraw a bank account.
@@ -255,7 +255,7 @@ identity `seq`), `schema.ts` is the truth.
 | M1 | `core`: money type, parser, ledger rules, **all section 5 examples as passing tests**. No I/O | Oct 26 |
 | M2 | DB schema, `ingest()` with persistence, idempotency, undo, bal/reconcile | Nov 1 |
 | M3 | Channel adapter running locally behind a tunnel, end-to-end from the real chat app | Nov 2 |
-| M4 | Deploy Lambda, permanent token, signature verification | Nov 8 |
+| M4 | Deploy Lambda, permanent token, secrets in Secrets Manager | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |

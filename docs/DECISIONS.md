@@ -155,3 +155,36 @@ because they hold Prisma's migration table. They held no real data.
 Why recorded: the temporary step plan (`docs/M2-PLAN.md`) is deleted; the decisions it carried are in the
 entries above. Both stores pass one shared contract suite, and the SPEC section 5 examples run end to end.
 Open for M3: the adapter's handling of a lost reply on a replayed id (see above).
+
+## 2026-10-30 (M3 plan)
+
+**The Telegram adapter replies in the webhook response body (`{method: 'sendMessage', chat_id, text}`), not with an outbound `sendMessage` call.**
+Why: the handler then needs no bot token and no HTTP client; only the `set-webhook` script uses the token.
+This closes the M2 open item: if our response is lost, Telegram retries, `ingest` returns `duplicate: true`,
+and the user gets "Already processed." Telegram does not report a failed delivery of a reply it has accepted;
+an outbound call that ignores errors has the same gap, so this is accepted.
+
+**`externalId` is `${chat.id}:${message_id}`, not `update_id`.**
+Why: Telegram may restart `update_id` numbering at random after a week without updates, so it is not a stable key.
+This must not change after the first real write, or dedupe breaks.
+
+**`now` for a Telegram message is `message.date` (when Telegram received it), not our server clock.**
+Why: it stays the same across retries, and a late delivery still gets the right "today" and "yesterday". SPEC section 6 updated.
+
+**The webhook secret is verified from M3, not M4.** SPEC M4 row reworded.
+Why: the tunnel URL is public, and hard rule 10 applies from the first request. The adapter refuses to start if
+the secret is empty or not 1-256 chars of `[A-Za-z0-9_-]`, or if the allowed user id is missing. Both sides are
+SHA-256 hashed before `timingSafeEqual`, which throws on unequal lengths.
+
+**A store error replies 200 "Something went wrong, nothing was saved. Try again." instead of returning 500.**
+Why: the DB transaction rolls back, so nothing is half-written and resending is safe. A 500 makes Telegram retry
+a message that may fail every time, for hours, holding up later messages.
+
+**Ignored silently (200, no reply, no write): wrong sender, non-private chat, `edited_message`, non-text, malformed JSON.**
+Edits are also excluded by `allowed_updates: ["message"]`. `/start` gets the normal unknown-command clarification.
+
+**Adapter logs are fixed labels only, never an error object.** Why: Drizzle and pg errors carry query
+parameters, which include `rawText` (hard rule 8).
+
+**The adapter runs TypeScript with `tsx` 4.23.15 (pinned).** Why: Node's built-in type stripping needs file
+extensions in imports, and the workspace uses extensionless imports. `tsx --env-file` also means no dotenv.
