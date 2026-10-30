@@ -5,6 +5,7 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
+    "dev": "tsx --env-file=.env src/local.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

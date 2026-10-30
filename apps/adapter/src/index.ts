@@ -1,1 +1,9 @@
-export {};
+export {
+  handleWebhook,
+  parseConfig,
+  type LogLabel,
+  type WebhookConfig,
+  type WebhookDeps,
+  type WebhookRequest,
+  type WebhookResponse,
+} from './telegram';
