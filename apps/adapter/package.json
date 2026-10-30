@@ -6,6 +6,7 @@
   "main": "src/index.ts",
   "scripts": {
     "dev": "tsx --env-file=.env src/local.ts",
+    "webhook:set": "tsx --env-file=.env scripts/set-webhook.ts",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
