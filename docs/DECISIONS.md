@@ -238,3 +238,17 @@ repo, the template and `samconfig.toml` (hard rule 9).
 
 **The stack deploys to a personal AWS account through a named SSO profile (`hisaab`).**
 Why: short-lived credentials, no long-lived access keys on disk, and financial data stays out of shared accounts.
+
+**The stack is deployed with AWS SAM, not Terraform or CDK.**
+Why: the stack is one Lambda, one HTTP API route, one log group and one IAM grant, in one account and region.
+- SAM is CloudFormation underneath, so AWS keeps the deployed state. There is no state file to lose, lock or
+  protect; a safe Terraform setup would need an S3 bucket and a DynamoDB lock table, more infrastructure than the app.
+- One `AWS::Serverless::Function` with an `HttpApi` event expands into the function, role, API, route, stage,
+  integration and invoke permission. Terraform needs these as 8-10 hand-wired resources.
+- A failed deploy rolls back to the last good stack. `sam local invoke` runs the handler in the real Lambda runtime.
+- SAM was already installed and has its own AWS client.
+Rejected: Terraform. Its strengths are multi-provider stacks, a clearer `plan`, and big multi-environment estates,
+and none of these apply: Supabase and the Telegram webhook are set once by hand or by script. CDK: a CLI, a
+bootstrap stack and npm dependencies for a handful of resources. Console clicks: not repeatable, reviewable or in git.
+Revisit if there are several environments, or Supabase and DNS should be managed as code. The Lambda code does not
+depend on the deploy tool, so switching is cheap.
