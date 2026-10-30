@@ -1,0 +1,18 @@
+# SAM CLI settings for `sam deploy`, run from apps/adapter. No secrets, no account id.
+version = 0.1
+
+[default.global.parameters]
+stack_name = "hisaab"
+
+[default.deploy.parameters]
+profile = "hisaab"
+region = "ap-south-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+s3_prefix = "hisaab"
+confirm_changeset = true
+fail_on_empty_changeset = false
+
+[default.validate.parameters]
+region = "ap-south-1"
+lint = true

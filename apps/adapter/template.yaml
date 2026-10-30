@@ -1,0 +1,68 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Hisaab Telegram webhook (Lambda behind an HTTP API)
+
+# Deploy from apps/adapter: `pnpm deploy:aws` (builds dist/ first).
+# The secret is created by hand, never here. See README.
+
+Parameters:
+  SecretName:
+    Type: String
+    Default: hisaab/webhook
+    Description: >-
+      Secrets Manager secret name (not ARN). A JSON object with string values for
+      TELEGRAM_WEBHOOK_SECRET, TELEGRAM_ALLOWED_USER_ID and DATABASE_URL.
+    AllowedPattern: '^[A-Za-z0-9/_+=.@-]+$'
+
+Resources:
+  # Explicit so retention is set; the implicit group keeps logs forever.
+  WebhookLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-webhook
+      RetentionInDays: 14
+
+  WebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${AWS::StackName}-webhook
+      CodeUri: dist/
+      Handler: lambda.handler
+      Runtime: nodejs22.x
+      Architectures: [arm64]
+      MemorySize: 256
+      # Above the 10s statement timeout and 5s connect timeout, below
+      # API Gateway's 30s integration limit.
+      Timeout: 20
+      LoggingConfig:
+        LogGroup: !Ref WebhookLogs
+        LogFormat: Text
+      Environment:
+        Variables:
+          SECRET_ID: !Ref SecretName
+      Policies:
+        # Read one secret only. The trailing ?????? is the 6-character suffix
+        # AWS appends to secret ARNs; it stops a match on e.g. hisaab/webhook-old.
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !Sub arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}-??????
+      Events:
+        Webhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref WebhookApi
+            Method: POST
+            Path: /
+
+  # Only POST / is routed; anything else gets API Gateway's 404 without
+  # invoking the Lambda. No access logs.
+  WebhookApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 5
+        ThrottlingRateLimit: 2
+
+Outputs:
+  WebhookUrl:
+    Description: Pass to `pnpm webhook:set` (the root, with trailing slash).
+    Value: !Sub https://${WebhookApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/
