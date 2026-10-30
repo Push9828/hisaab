@@ -43,13 +43,11 @@ function update(
 
 function setup(store: LedgerStore = new MemoryStore()) {
   const logs: LogLabel[] = [];
-  const post = (body: unknown, secret: string | undefined = SECRET) =>
+  const post = (body: unknown, secret: string | null = SECRET) =>
     handleWebhook(
       {
         headers:
-          secret === undefined
-            ? {}
-            : { 'x-telegram-bot-api-secret-token': secret },
+          secret === null ? {} : { 'x-telegram-bot-api-secret-token': secret },
         body: typeof body === 'string' ? body : JSON.stringify(body),
       },
       { config: CONFIG, store, log: (label) => logs.push(label) },
@@ -103,7 +101,7 @@ describe('parseConfig: refuses to start on a weak or missing setting', () => {
 
 describe('handleWebhook: secret header (SPEC section 9, hard rule 10)', () => {
   it.each([
-    ['missing', undefined],
+    ['missing', null],
     ['wrong', 'wrong-secret'],
     ['a prefix of the real one', SECRET.slice(0, -1)],
     ['empty', ''],
