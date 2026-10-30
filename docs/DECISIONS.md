@@ -216,3 +216,25 @@ One connection is plenty for a single user.
 **The local server checks the secret before reading the body, and has short timeouts** (5s headers, 10s request,
 checked every second, 50 connections). Why: the tunnel URL is public; strangers must not hold connections open.
 A pool `error` listener, a startup `select 1`, and uncaught-error handlers print labels only, never a stack trace.
+
+## 2026-10-30 (M4 plan)
+
+**The bot token never reaches the Lambda.** SPEC M4 row and section 9 reworded ("permanent token" was a
+WhatsApp leftover: BotFather tokens do not expire). Why: the reply goes back in the webhook response body (M3),
+so only `set-webhook` on the laptop needs the token. A Lambda that cannot hold it cannot leak it.
+
+**Production Postgres is Supabase in Mumbai (ap-south-1), the same region as the Lambda.**
+Why: one region means no cross-region round trip on every query, and the data stays in India. Neon's nearest
+region is Singapore. The Lambda uses Supabase's direct (non-pooled) endpoint with `sslmode=verify-full`.
+Why direct: transaction-mode poolers can reject `statement_timeout` as a startup parameter, and one Lambda at a
+time needs no pooler.
+
+**The Lambda reads one JSON secret from Secrets Manager: `TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_ID`,
+`DATABASE_URL`.** It passes through the same `parseConfig` as the local server. The production webhook secret is
+new, not the dev one. Why the user id is in the secret: it is not secret, but this keeps the real id out of the
+repo, the template and `samconfig.toml` (hard rule 9).
+
+**Production starts empty.** Nothing is copied from the local database, which held only test rows.
+
+**The stack deploys to a personal AWS account through a named SSO profile (`hisaab`).**
+Why: short-lived credentials, no long-lived access keys on disk, and financial data stays out of shared accounts.

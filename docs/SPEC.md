@@ -160,7 +160,7 @@ packages/core: ingest(message, store) -> dedupe (claim key) -> parse -> validate
         |                                                        |
         |                                                        +--> categorizer (rules, LLM fallback)
         v
-Postgres (Neon or Supabase free tier) via Drizzle
+Postgres (Supabase free tier, Mumbai ap-south-1) via Drizzle
         ^
         |  server-side reads
 Next.js dashboard (Better Auth + Google OAuth, email allowlist)
@@ -245,7 +245,9 @@ identity `seq`), `schema.ts` is the truth.
 - Secrets in environment or AWS Secrets Manager. Never in the repo. `.env` is gitignored.
 - Dashboard requires auth. It is financial data on a public URL.
 - Logs must not contain full message bodies or balances.
-- Bot token and webhook secret live in AWS Secrets Manager or environment. Rotate via BotFather if leaked.
+- The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
+- The bot token is never given to the Lambda: replies go back in the webhook response, so only the
+  `set-webhook` script on the laptop uses it, from the gitignored `.env`. Rotate via BotFather if leaked.
 
 ## 10. Milestones (target dates are proposals: edit them)
 
@@ -255,7 +257,7 @@ identity `seq`), `schema.ts` is the truth.
 | M1 | `core`: money type, parser, ledger rules, **all section 5 examples as passing tests**. No I/O | Oct 26 |
 | M2 | DB schema, `ingest()` with persistence, idempotency, undo, bal/reconcile | Nov 1 |
 | M3 | Channel adapter running locally behind a tunnel, end-to-end from the real chat app | Nov 2 |
-| M4 | Deploy Lambda, permanent token, secrets in Secrets Manager | Nov 8 |
+| M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
