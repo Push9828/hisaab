@@ -10,7 +10,7 @@ export interface WebhookConfig {
 
 /** The only things the adapter ever logs. Never text, balances or errors (hard rule 8). */
 export type LogLabel =
-  'unauthorized' | 'ignored' | 'processed' | 'duplicate' | 'store_error';
+  'unauthorized' | 'ignored' | 'processed' | 'duplicate' | 'error';
 
 export interface WebhookRequest {
   /** Lowercase header names, as `node:http` gives them. */
@@ -47,7 +47,7 @@ interface TextMessage {
 
 const SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 const SECRET_FORMAT = /^[A-Za-z0-9_-]{1,256}$/;
-const STORE_ERROR_REPLY = 'Something went wrong, nothing was saved. Try again.';
+const ERROR_REPLY = 'Something went wrong, nothing was saved. Try again.';
 
 /** Reads adapter settings from the environment. Throws (without echoing values) if any is unsafe. */
 export function parseConfig(
@@ -113,8 +113,8 @@ export async function handleWebhook(
   } catch {
     // The error may carry query parameters, i.e. the message text. Never log it.
     // The run rolled back, so resending is safe.
-    log('store_error');
-    return send(STORE_ERROR_REPLY);
+    log('error');
+    return send(ERROR_REPLY);
   }
 }
 

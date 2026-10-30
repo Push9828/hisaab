@@ -268,7 +268,7 @@ describe('handleWebhook: time comes from message.date', () => {
   });
 });
 
-describe('handleWebhook: store failure (hard rule 8)', () => {
+describe('handleWebhook: any thrown error, e.g. the store (hard rule 8)', () => {
   it('replies "nothing was saved" with 200, and logs only a label', async () => {
     const leaky = new Error(
       'insert failed: params ["petrol 4k cc icici", 400000]',
@@ -282,7 +282,7 @@ describe('handleWebhook: store failure (hard rule 8)', () => {
     expect(await say('petrol 4k cc icici')).toEqual(
       replyTo('Something went wrong, nothing was saved. Try again.'),
     );
-    expect(logs).toEqual(['store_error']);
+    expect(logs).toEqual(['error']);
     for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
   });
 });

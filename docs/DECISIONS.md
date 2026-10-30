@@ -176,7 +176,7 @@ Why: the tunnel URL is public, and hard rule 10 applies from the first request. 
 the secret is empty or not 1-256 chars of `[A-Za-z0-9_-]`, or if the allowed user id is missing. Both sides are
 SHA-256 hashed before `timingSafeEqual`, which throws on unequal lengths.
 
-**A store error replies 200 "Something went wrong, nothing was saved. Try again." instead of returning 500.**
+**Any error thrown while processing (store failure, or a bug such as a failed invariant check) is logged as `error` and replies 200 "Something went wrong, nothing was saved. Try again." instead of returning 500.**
 Why: the DB transaction rolls back, so nothing is half-written and resending is safe. A 500 makes Telegram retry
 a message that may fail every time, for hours, holding up later messages.
 
