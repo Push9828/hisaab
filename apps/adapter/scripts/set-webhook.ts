@@ -1,8 +1,12 @@
 import { parseConfig } from '../src/telegram';
 
 /**
- * Points the bot's webhook at a public HTTPS URL (the tunnel in M3).
- * Usage: pnpm --filter @hisaab/adapter webhook:set https://<tunnel-host>
+ * Points the bot's webhook at a public HTTPS URL.
+ * Local tunnel (reads .env):
+ *   pnpm --filter @hisaab/adapter webhook:set https://<tunnel-host>/
+ * Production API Gateway (reads .env.production; its secret must match the
+ * hisaab/webhook secret in Secrets Manager):
+ *   pnpm --filter @hisaab/adapter webhook:set:prod <WebhookUrl stack output>
  *
  * The bot token is part of the request URL, so neither the URL nor any
  * fetch error is ever printed. Only Telegram's verdict is.
@@ -14,9 +18,10 @@ const { secret } = parseConfig(process.env);
 
 const raw = process.argv[2];
 const url = raw ? new URL(raw) : null;
-// local.ts only serves POST /, so the webhook must point at the root.
+// local.ts and the API Gateway route only serve POST /, so the webhook must
+// point at the root.
 if (!url || url.protocol !== 'https:' || url.pathname !== '/' || url.search) {
-  throw new Error('Pass the tunnel root as https://<host>/ (no path)');
+  throw new Error('Pass the webhook root as https://<host>/ (no path)');
 }
 
 let response: Response;

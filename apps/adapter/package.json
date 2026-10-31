@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx --env-file=.env src/local.ts",
     "webhook:set": "tsx --env-file=.env scripts/set-webhook.ts",
+    "webhook:set:prod": "tsx --env-file=.env.production scripts/set-webhook.ts",
     "typecheck": "tsc -p tsconfig.json",
     "build": "esbuild src/lambda.ts --bundle --platform=node --target=node22 --format=cjs --external:pg-native --outfile=dist/lambda.cjs",
     "deploy:aws": "pnpm build && sam deploy"
