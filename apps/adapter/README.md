@@ -1,15 +1,20 @@
 # @hisaab/adapter
 
-Telegram webhook adapter. In M3 it runs on your laptop behind a tunnel. In M4 it moves to Lambda.
+Telegram webhook adapter. Production runs on AWS Lambda behind API Gateway (M4). For development it
+can still run on your laptop behind a tunnel (M3).
 
 ```
-Phone -> Telegram -> tunnel -> local.ts (127.0.0.1:8787) -> handleWebhook -> core.ingest -> Postgres
-                                                     reply <- { method: 'sendMessage', ... } (the response body)
+Production: Phone -> Telegram -> API Gateway (POST /) -> lambda.ts  -> handleWebhook -> core.ingest -> Supabase (Mumbai)
+Local:      Phone -> Telegram -> tunnel -> local.ts (127.0.0.1:8787) -> handleWebhook -> core.ingest -> local Postgres
+                                          reply <- { method: 'sendMessage', ... } (the response body)
 ```
+
+There is one bot, so the webhook points at one of these at a time. `webhook:set` with a tunnel URL
+takes the bot away from production until you run `webhook:set:prod` again.
 
 `handleWebhook` (`src/telegram.ts`) checks the secret header, then the message shape, then the
 sender. Anything it does not handle gets a silent 200. Logs are a startup line plus fixed labels
-(`unauthorized`, `ignored`, `processed`, `duplicate`, `error`, `bad_request`, `aborted`), never
+(`unauthorized`, `ignored`, `processed`, `duplicate`, `error`, `bad_request`, and `aborted` locally), never
 message text, balances or errors. The local server checks the secret before reading the body,
 and cuts off slow senders (5s headers, 10s request).
 
@@ -56,7 +61,7 @@ as that is within 24 hours (Telegram drops older pending updates).
 **No reply?** Ask Telegram what went wrong (this never prints the token):
 
 ```bash
-tg getWebhookInfo | grep -oE '"(url|pending_update_count|last_error_message)":("[^"]*"|[0-9]+)'
+pnpm --filter @hisaab/adapter webhook:info
 ```
 
 **cloudflared says "critical failures" / QUIC and TCP 7844 blocked:** check that a VPN (for
@@ -104,3 +109,106 @@ the first real message:** it deletes everything in the volume, real entries and 
 ```bash
 pnpm --filter @hisaab/db db:down -v && pnpm --filter @hisaab/db db:up && pnpm db:migrate
 ```
+
+## Production (AWS)
+
+Lambda (`nodejs22.x`, arm64) behind an HTTP API in `ap-south-1`, deployed with SAM (`template.yaml`,
+`samconfig.toml`). At cold start it reads one JSON secret, `hisaab/webhook`, from Secrets Manager:
+`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_ID`, `DATABASE_URL`. The bot token is not in it;
+replies go back in the response body, so only the laptop needs the token. Logs are kept 14 days.
+
+Prod files on the laptop (gitignored, `chmod 600`):
+- `apps/adapter/.env.production`: `TELEGRAM_BOT_TOKEN`, the **prod** `TELEGRAM_WEBHOOK_SECRET`,
+  `TELEGRAM_ALLOWED_USER_ID`. Read by `webhook:set:prod`.
+- `packages/db/.env.production`: `DATABASE_URL`, Supabase's **Session pooler** URI (port 5432), with no
+  `?sslmode`. TLS is verified in code against Supabase's CA. Read by `db:migrate:prod`.
+
+All commands below run from the repo root, after `aws sso login --profile hisaab`.
+
+### Deploy or redeploy
+
+```bash
+pnpm --filter @hisaab/db db:migrate:prod          # first, if the change adds a migration
+pnpm --filter @hisaab/adapter deploy:aws          # esbuild bundle + sam deploy (confirm the changeset)
+```
+
+A failed deploy rolls back by itself. To go back to an earlier version, check out its commit and
+deploy again. Migrations are never run by a deploy, and a rollback does not undo one, so keep
+migrations backward compatible with the previous code.
+
+The webhook URL, needed only when the API is recreated:
+
+```bash
+aws cloudformation describe-stacks --stack-name hisaab --profile hisaab --region ap-south-1 \
+  --query "Stacks[0].Outputs[?OutputKey=='WebhookUrl'].OutputValue" --output text
+pnpm --filter @hisaab/adapter webhook:set:prod <WebhookUrl>
+```
+
+### Check it
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST <WebhookUrl> -d '{}'   # 401: no secret header
+pnpm --filter @hisaab/adapter webhook:info                              # no last_error_message
+aws logs tail /aws/lambda/hisaab-webhook --since 15m --profile hisaab --region ap-south-1
+```
+
+Logs must show only the runtime's `INIT_START` (cold starts), `START`, `END` and `REPORT` lines, and
+labels (`processed`, `unauthorized`, ...), each prefixed with a timestamp, request id and `INFO`. A
+`500` from the curl means the Lambda could not read its secret or it is malformed.
+
+### Change a value in the secret (webhook secret, database password)
+
+The laptop's `.env.production` files are the source of truth; the secret is rebuilt from them. The
+Lambda caches the secret until its next cold start, so each change ends by forcing one.
+
+Two shared steps, referred to below:
+
+- **Push the secret.** Builds the JSON from the two files and pipes it to AWS, so no value is
+  written to disk, typed, or shown in the process list:
+  ```bash
+  node -e '
+    const { parseEnv } = require("node:util"), { readFileSync: read } = require("node:fs");
+    const a = parseEnv(read("apps/adapter/.env.production", "utf8"));
+    const d = parseEnv(read("packages/db/.env.production", "utf8"));
+    process.stdout.write(JSON.stringify({ TELEGRAM_WEBHOOK_SECRET: a.TELEGRAM_WEBHOOK_SECRET,
+      TELEGRAM_ALLOWED_USER_ID: a.TELEGRAM_ALLOWED_USER_ID, DATABASE_URL: d.DATABASE_URL }));' |
+  aws secretsmanager put-secret-value --secret-id hisaab/webhook --secret-string file:///dev/stdin \
+    --profile hisaab --region ap-south-1 --query VersionId --output text
+  ```
+- **Force a cold start.** Changing an environment variable replaces the running environments.
+  `--environment` replaces all variables, so `SECRET_ID` must be repeated. The next `sam deploy`
+  removes `ROTATED` again, which is harmless.
+  ```bash
+  aws lambda update-function-configuration --function-name hisaab-webhook --profile hisaab \
+    --region ap-south-1 --environment "Variables={SECRET_ID=hisaab/webhook,ROTATED=$(date +%s)}" >/dev/null
+  ```
+
+**New webhook secret:**
+1. Put a new `TELEGRAM_WEBHOOK_SECRET` (`openssl rand -hex 32`) in `apps/adapter/.env.production`.
+2. Push the secret, then force a cold start.
+3. `pnpm --filter @hisaab/adapter webhook:set:prod <WebhookUrl>`.
+
+Deliveries between steps 2 and 3 get 401, and Telegram retries them. Nothing is lost.
+
+**New database password:**
+1. Reset it in Supabase (Project Settings > Database). Use letters and digits only, or
+   percent-encode it in the URL.
+2. Put it in `packages/db/.env.production`, then run `pnpm --filter @hisaab/db db:migrate:prod` as
+   a connection check. It should print `migrations applied (hosted, TLS verified)`.
+3. Push the secret, then force a cold start, straight away.
+4. Send `accounts` from the phone.
+
+Messages sent between steps 1 and 3 get the "Something went wrong" reply. That is a 200, so
+Telegram does not retry them: resend them once `accounts` works.
+
+### Rotate the bot token
+
+In `@BotFather`, `/revoke`, then put the new token in both `apps/adapter/.env` and
+`apps/adapter/.env.production`, and run `webhook:set:prod`. The Lambda never has the token, so
+nothing in AWS changes.
+
+### Local development while production is live
+
+Production data is on Supabase and local data is in Docker; they are never mixed. Pointing the bot
+at a tunnel (`webhook:set`) sends your messages to the **local** database until you run
+`webhook:set:prod` again. Use the fake-alias checklist above, never real entries.

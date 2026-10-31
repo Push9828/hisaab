@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
+import { parseDatabaseUrl } from './database-url';
 import { accounts, entries, processedMessages, transactions } from './schema';
 
 import type {
@@ -24,10 +25,11 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 const RUN_LOCK_KEY = 7_240_001;
 
 /**
- * Time spent waiting on the run lock counts as statement time. It only stops a
- * stuck statement from blocking forever, and must stay below the Lambda's 20s
- * timeout. Set per transaction with SET LOCAL rather than as a connection
- * startup parameter, which poolers such as Supavisor may reject.
+ * Per statement, not per run: it stops one stuck statement (including a wait
+ * on the run lock) from blocking forever. A run issues several statements, so
+ * the Lambda's 20s timeout is the overall bound. Set per transaction with
+ * SET LOCAL rather than as a connection startup parameter, which poolers such
+ * as Supavisor may reject.
  */
 const STATEMENT_TIMEOUT = '10s';
 
@@ -39,21 +41,18 @@ const CONNECT_TIMEOUT_MS = 5_000;
  * parameters, which include message bodies (hard rule 8).
  *
  * With `ca`, the connection must use TLS and the server certificate must chain
- * to `ca` and match the host name (libpq's verify-full). The URL must then
- * carry no ssl* parameters: pg lets them replace the `ssl` option entirely.
+ * to `ca` and match the host name (libpq's verify-full). The URL is checked by
+ * `parseDatabaseUrl`, so no URL parameter can turn that off.
  */
 export function createDb(
   connectionString: string,
-  options: { ca?: string } = {},
+  options: { ca?: string; max?: number } = {},
 ): { db: Db; pool: pg.Pool } {
-  if (options.ca !== undefined && /[?&]ssl/i.test(connectionString)) {
-    throw new Error(
-      'DATABASE_URL must not set ssl parameters when a CA is given',
-    );
-  }
+  parseDatabaseUrl(connectionString);
   const pool = new pg.Pool({
     connectionString,
     connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    ...(options.max !== undefined && { max: options.max }),
     ...(options.ca !== undefined && { ssl: { ca: options.ca } }),
   });
   return { db: drizzle(pool), pool };

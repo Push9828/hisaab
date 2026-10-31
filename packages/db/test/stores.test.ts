@@ -190,16 +190,22 @@ describe('ingest() through DrizzleStore', () => {
   });
 });
 
-describe('createDb', () => {
-  it('rejects ssl parameters in the URL when a CA is given (they would replace it)', () => {
-    for (const q of [
-      '?sslmode=verify-full',
-      '?a=1&sslrootcert=x',
-      '?SSL=true',
-    ]) {
-      expect(() =>
-        createDb(`postgresql://u:p@db.invalid:5432/x${q}`, { ca: 'fake' }),
-      ).toThrow('must not set ssl parameters');
-    }
+describe('DrizzleStore statement timeout', () => {
+  it('every run sets a 10s statement_timeout, local to its transaction', async () => {
+    // Captures the transaction handle so the probe runs inside the same run.
+    let inner: Parameters<Parameters<typeof db.transaction>[0]>[0] | undefined;
+    const spying = {
+      transaction: (cb: Parameters<typeof db.transaction>[0]) =>
+        db.transaction((t) => {
+          inner = t;
+          return cb(t);
+        }),
+    } as unknown as typeof db;
+    const during = await new DrizzleStore(spying).run(
+      async () => (await inner!.execute(sql`SHOW statement_timeout`)).rows[0],
+    );
+    expect(during).toEqual({ statement_timeout: '10s' });
+    const after = await db.execute(sql`SHOW statement_timeout`);
+    expect(after.rows[0]).not.toEqual({ statement_timeout: '10s' });
   });
 });

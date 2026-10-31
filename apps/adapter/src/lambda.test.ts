@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { HttpApiEvent } from './http-api';
+import type * as HisaabDb from '@hisaab/db';
 
 // All ids, secrets and URLs here are fake.
 const SECRET = 'test-secret_0123456789_abcdefghijkl'; // 34 chars, fake
@@ -12,6 +13,7 @@ const CA = 'fake CA';
 const aws = vi.hoisted(() => ({ send: vi.fn() }));
 const pg = vi.hoisted(() => ({
   end: vi.fn<() => Promise<void>>(),
+  on: vi.fn(),
   createDb: vi.fn(),
 }));
 
@@ -26,11 +28,14 @@ vi.mock('@aws-sdk/client-secrets-manager', () => ({
 
 vi.mock('@hisaab/db', async () => {
   const { MemoryStore } = await import('@hisaab/core');
+  const { parseDatabaseUrl } =
+    await vi.importActual<typeof HisaabDb>('@hisaab/db');
   return {
     SUPABASE_ROOT_CA: CA,
+    parseDatabaseUrl,
     createDb: pg.createDb.mockImplementation(() => ({
       db: {},
-      pool: { on: vi.fn(), end: pg.end },
+      pool: { on: pg.on, end: pg.end },
     })),
     // Ignores the db handle it is given; a fresh in-memory ledger each time.
     DrizzleStore: class extends MemoryStore {
@@ -84,6 +89,7 @@ beforeEach(() => {
   vi.stubEnv('SECRET_ID', SECRET_ID);
   aws.send.mockReset().mockResolvedValue({ SecretString: secretString() });
   pg.end.mockReset().mockResolvedValue();
+  pg.on.mockClear();
   pg.createDb.mockClear();
   consoleCalls = [];
   for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) {
@@ -118,7 +124,8 @@ describe('lambda handler', () => {
     expect(aws.send.mock.calls[0]?.[0]).toMatchObject({
       input: { SecretId: SECRET_ID },
     });
-    expect(pg.createDb).toHaveBeenCalledWith(DB_URL, { ca: CA });
+    expect(pg.createDb).toHaveBeenCalledWith(DB_URL, { ca: CA, max: 1 });
+    expect(pg.on).toHaveBeenCalledWith('error', expect.any(Function));
   });
 
   it('opens a fresh pool per invocation and always ends it', async () => {
@@ -143,7 +150,16 @@ describe('lambda handler', () => {
     const res = await handler(event('accounts'));
     expect(res.statusCode).toBe(200);
     expect(res.body).toBeDefined();
-    expect(JSON.stringify(consoleCalls)).not.toContain('fake-password');
+    expect(consoleCalls).toEqual([['processed'], ['error']]);
+  });
+
+  it('a throw outside handleWebhook is a 500 with only the label', async () => {
+    pg.createDb.mockImplementationOnce(() => {
+      throw new Error(`cannot connect to ${DB_URL}`);
+    });
+    const handler = await load();
+    expect(await handler(event('accounts'))).toEqual({ statusCode: 500 });
+    expect(consoleCalls).toEqual([['error']]);
   });
 });
 
@@ -171,6 +187,26 @@ describe('lambda handler: settings failures (500, so Telegram retries; labels on
     [
       'a weak webhook secret',
       { SecretString: secretString({ TELEGRAM_WEBHOOK_SECRET: 'short' }) },
+    ],
+    [
+      'ssl parameters in DATABASE_URL',
+      {
+        SecretString: secretString({
+          DATABASE_URL: `${DB_URL}?sslmode=disable`,
+        }),
+      },
+    ],
+    [
+      'an encoded ssl parameter in DATABASE_URL',
+      {
+        SecretString: secretString({
+          DATABASE_URL: `${DB_URL}?%73slmode=disable`,
+        }),
+      },
+    ],
+    [
+      'a DATABASE_URL that is not a URL',
+      { SecretString: secretString({ DATABASE_URL: 'postgresql://u:p#w@/x' }) },
     ],
     [
       'a numeric user id (secret values must be strings)',

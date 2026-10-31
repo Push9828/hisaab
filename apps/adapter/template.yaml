@@ -31,8 +31,8 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 256
-      # Above the 10s statement timeout and 5s connect timeout, below
-      # API Gateway's 30s integration limit.
+      # The overall bound on one message: above the 5s connect timeout and the
+      # 10s per-statement timeout, below API Gateway's 30s integration limit.
       Timeout: 20
       LoggingConfig:
         LogGroup: !Ref WebhookLogs

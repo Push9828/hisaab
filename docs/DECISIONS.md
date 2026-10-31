@@ -256,7 +256,8 @@ depend on the deploy tool, so switching is cheap.
 ## 2026-10-31 (M4 step 6)
 
 **The Lambda and prod migrations use Supabase's Session pooler (port 5432), not the direct endpoint.** This
-replaces "direct (non-pooled) endpoint" in the 2026-10-30 entry. Why: the direct host `db.<ref>.supabase.co` is
+replaces "direct (non-pooled) endpoint" and "`sslmode=verify-full`" in the 2026-10-30 entry (TLS is now set in
+code, see below). Why: the direct host `db.<ref>.supabase.co` is
 IPv6-only, and a Lambda outside a VPC has no IPv6 egress. The Session pooler is IPv4 and gives each client its own
 server connection for the session, so the transaction-scoped advisory lock behaves as before.
 Rejected: the IPv4 add-on (paid, for one user), a dual-stack VPC (out of scope), the Transaction pooler (6543).
@@ -267,7 +268,8 @@ commit. 10s sits below the Lambda's 20s timeout. All queries go through `run()`,
 
 **TLS to Supabase is configured in code, verified against Supabase's root CA, which is embedded in `@hisaab/db`.**
 Why: pg lets any `ssl*` parameter in the URL replace the `ssl` option wholesale, and a URL without one connects in
-plaintext. So the URL carries no `ssl*` parameters (`createDb` rejects them when given a CA), and the Lambda and
+plaintext. So `parseDatabaseUrl` (used by `createDb`, the Lambda's settings load and `migrate.ts`) rejects `ssl*`, `host`
+and `port` query parameters, after decoding their names (`%73slmode` is `sslmode`), and the Lambda and
 `db:migrate:prod` always pass the CA. Node verifies the chain and the host name (libpq's `verify-full`).
 The CA is public; in code, the Lambda bundle needs no file path. It expires 2031-04-26.
 
@@ -284,3 +286,37 @@ Why not drizzle-kit:
 - Making it work (`util.parseEnv`, URL split into fields because its `url` form takes no `ssl`) duplicates the TLS
   setup from `createDb` and still prints nothing on failure.
 The script reuses `createDb`, the Lambda's connection path, and prints failures with the URL and password redacted.
+
+## 2026-10-31 (M4 complete)
+
+**The webhook runs on Lambda behind API Gateway; the tunnel is out of the production path.** Deployed and
+verified: a request without the secret header gets 401, `getWebhookInfo` shows no errors, and CloudWatch holds only
+runtime lines and labels. A message takes about 0.3-0.6s, including a fresh TLS connection to Supabase.
+
+**There is one bot for development and production.** Why: a second bot means a second token, user-id lookup and
+chat for no gain to one user. The cost: `webhook:set` (tunnel) takes the bot off production until
+`webhook:set:prod`. Local and production data stay separate (Docker vs Supabase). Revisit if local testing while
+production is live becomes frequent.
+
+**A changed secret takes effect at the next cold start, forced with a configuration change.** Why: the Lambda
+caches the secret for its lifetime (one Secrets Manager call per cold start). Rotations are rare and manual, so
+forcing a cold start (README) beats a cache TTL, which would add a call and a failure mode to warm invocations.
+
+**`webhook:info` replaces the `tg getWebhookInfo | grep` one-liner.** It prints the host and status fields only,
+never the token, and is the check after every deploy or webhook change.
+
+## 2026-10-31 (M4 review)
+
+**Accepted: anyone with the webhook URL can use up the API Gateway throttle (2 rps, burst 5) and delay messages.**
+Why: Telegram retries 429s, so nothing is lost, and the throttle is what caps the cost. Reserved concurrency was
+skipped in step 5 (account quota). Mitigation: the URL stays out of the repo, blog posts and screenshots.
+
+**Kept: a body over 64 KB with a valid secret gets 413, not 200.** Why: only Telegram holds the secret, and real
+updates are far below 64 KB (text is capped at 4096 characters), so the queue-stall risk the review raised is
+theoretical. Changing it means changing the M3 local server too. Revisit if `webhook:info` ever shows a stuck 413.
+
+**`webhook:info` reads `.env`, not `.env.production`.** Why: there is one bot and one token; the README's
+token rotation updates both files.
+
+**Supabase's Data API is off (confirmed in the dashboard, 2026-10-31).** Why: Drizzle creates the tables in `public`, which Supabase publishes over
+PostgREST to the `anon` role by default. Hisaab only connects over Postgres, so the API is pure exposure.

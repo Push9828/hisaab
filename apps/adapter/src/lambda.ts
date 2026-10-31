@@ -2,7 +2,12 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
-import { createDb, DrizzleStore, SUPABASE_ROOT_CA } from '@hisaab/db';
+import {
+  createDb,
+  DrizzleStore,
+  parseDatabaseUrl,
+  SUPABASE_ROOT_CA,
+} from '@hisaab/db';
 
 import {
   handleHttpApi,
@@ -63,6 +68,8 @@ async function fetchSettings(): Promise<Settings> {
   }
   const config = parseConfig(values);
   if (!values.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+  // Fails here, with the 500-and-retry path, rather than on every message.
+  parseDatabaseUrl(values.DATABASE_URL);
   return { config, databaseUrl: values.DATABASE_URL };
 }
 
@@ -79,20 +86,27 @@ export async function handler(event: HttpApiEvent): Promise<HttpApiResult> {
   // A fresh pool per invocation: a frozen Lambda keeps dead idle sockets,
   // which would fail the first message after a quiet spell. pg connects
   // lazily, so a 401 never opens a connection. Production is Supabase, so TLS
-  // is always on and verified against its CA.
-  const { db, pool } = createDb(settingsNow.databaseUrl, {
-    ca: SUPABASE_ROOT_CA,
-  });
-  pool.on('error', () => log('error'));
+  // is always on and verified against its CA. One invocation, one connection.
+  let pool: ReturnType<typeof createDb>['pool'] | undefined;
   try {
-    // Never throws: handleWebhook turns processing errors into a reply.
+    const created = createDb(settingsNow.databaseUrl, {
+      ca: SUPABASE_ROOT_CA,
+      max: 1,
+    });
+    pool = created.pool;
+    pool.on('error', () => log('error'));
+    // handleWebhook turns processing errors into a reply, so this catch only
+    // sees failures before any write: a 500 (Telegram retries) is safe.
     return await handleHttpApi(event, {
       config: settingsNow.config,
-      store: new DrizzleStore(db),
+      store: new DrizzleStore(created.db),
       log,
     });
+  } catch {
+    log('error');
+    return { statusCode: 500 };
   } finally {
     // The reply is already decided; a failed close must not turn it into a 500.
-    await pool.end().catch(() => log('error'));
+    await pool?.end().catch(() => log('error'));
   }
 }
