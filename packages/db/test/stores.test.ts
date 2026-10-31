@@ -189,3 +189,17 @@ describe('ingest() through DrizzleStore', () => {
     expect(await spend()).toBe(400_000n);
   });
 });
+
+describe('createDb', () => {
+  it('rejects ssl parameters in the URL when a CA is given (they would replace it)', () => {
+    for (const q of [
+      '?sslmode=verify-full',
+      '?a=1&sslrootcert=x',
+      '?SSL=true',
+    ]) {
+      expect(() =>
+        createDb(`postgresql://u:p@db.invalid:5432/x${q}`, { ca: 'fake' }),
+      ).toThrow('must not set ssl parameters');
+    }
+  });
+});

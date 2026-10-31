@@ -7,6 +7,7 @@ const SECRET = 'test-secret_0123456789_abcdefghijkl'; // 34 chars, fake
 const ME = 100000001;
 const DB_URL = 'postgresql://fake:fake-password@db.invalid:5432/fake';
 const SECRET_ID = 'arn:aws:secretsmanager:ap-south-1:000000000000:secret:fake';
+const CA = 'fake CA';
 
 const aws = vi.hoisted(() => ({ send: vi.fn() }));
 const pg = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ vi.mock('@aws-sdk/client-secrets-manager', () => ({
 vi.mock('@hisaab/db', async () => {
   const { MemoryStore } = await import('@hisaab/core');
   return {
+    SUPABASE_ROOT_CA: CA,
     createDb: pg.createDb.mockImplementation(() => ({
       db: {},
       pool: { on: vi.fn(), end: pg.end },
@@ -116,7 +118,7 @@ describe('lambda handler', () => {
     expect(aws.send.mock.calls[0]?.[0]).toMatchObject({
       input: { SecretId: SECRET_ID },
     });
-    expect(pg.createDb).toHaveBeenCalledWith(DB_URL);
+    expect(pg.createDb).toHaveBeenCalledWith(DB_URL, { ca: CA });
   });
 
   it('opens a fresh pool per invocation and always ends it', async () => {

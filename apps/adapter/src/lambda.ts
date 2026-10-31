@@ -2,7 +2,7 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
-import { createDb, DrizzleStore } from '@hisaab/db';
+import { createDb, DrizzleStore, SUPABASE_ROOT_CA } from '@hisaab/db';
 
 import {
   handleHttpApi,
@@ -78,8 +78,11 @@ export async function handler(event: HttpApiEvent): Promise<HttpApiResult> {
 
   // A fresh pool per invocation: a frozen Lambda keeps dead idle sockets,
   // which would fail the first message after a quiet spell. pg connects
-  // lazily, so a 401 never opens a connection.
-  const { db, pool } = createDb(settingsNow.databaseUrl);
+  // lazily, so a 401 never opens a connection. Production is Supabase, so TLS
+  // is always on and verified against its CA.
+  const { db, pool } = createDb(settingsNow.databaseUrl, {
+    ca: SUPABASE_ROOT_CA,
+  });
   pool.on('error', () => log('error'));
   try {
     // Never throws: handleWebhook turns processing errors into a reply.

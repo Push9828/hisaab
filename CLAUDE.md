@@ -35,7 +35,7 @@ pnpm test:db         # store contract + Postgres tests (needs pnpm --filter @his
 pnpm typecheck
 pnpm lint
 pnpm db:generate     # drizzle-kit generate (after editing schema.ts)
-pnpm db:migrate      # drizzle-kit migrate
+pnpm db:migrate      # local DB (scripts/migrate.ts); prod: pnpm --filter @hisaab/db db:migrate:prod
 ```
 
 Run `pnpm typecheck && pnpm lint && pnpm test` before declaring any task done.

@@ -252,3 +252,35 @@ and none of these apply: Supabase and the Telegram webhook are set once by hand 
 bootstrap stack and npm dependencies for a handful of resources. Console clicks: not repeatable, reviewable or in git.
 Revisit if there are several environments, or Supabase and DNS should be managed as code. The Lambda code does not
 depend on the deploy tool, so switching is cheap.
+
+## 2026-10-31 (M4 step 6)
+
+**The Lambda and prod migrations use Supabase's Session pooler (port 5432), not the direct endpoint.** This
+replaces "direct (non-pooled) endpoint" in the 2026-10-30 entry. Why: the direct host `db.<ref>.supabase.co` is
+IPv6-only, and a Lambda outside a VPC has no IPv6 egress. The Session pooler is IPv4 and gives each client its own
+server connection for the session, so the transaction-scoped advisory lock behaves as before.
+Rejected: the IPv4 add-on (paid, for one user), a dual-stack VPC (out of scope), the Transaction pooler (6543).
+
+**`statement_timeout` is 10s, set with `SET LOCAL` at the start of every run, not as a startup parameter.**
+Why: poolers may reject startup parameters they do not know; `SET LOCAL` works on any endpoint and resets at
+commit. 10s sits below the Lambda's 20s timeout. All queries go through `run()`, so none escape the limit.
+
+**TLS to Supabase is configured in code, verified against Supabase's root CA, which is embedded in `@hisaab/db`.**
+Why: pg lets any `ssl*` parameter in the URL replace the `ssl` option wholesale, and a URL without one connects in
+plaintext. So the URL carries no `ssl*` parameters (`createDb` rejects them when given a CA), and the Lambda and
+`db:migrate:prod` always pass the CA. Node verifies the chain and the host name (libpq's `verify-full`).
+The CA is public; in code, the Lambda bundle needs no file path. It expires 2031-04-26.
+
+**Migrations, local and prod, run through one script, `packages/db/scripts/migrate.ts`, not `drizzle-kit migrate`.**
+`db:migrate` runs it with `tsx --env-file=.env`, `db:migrate:prod` with `--env-file=.env.production`. A `localhost`
+host connects without TLS; any other host requires TLS with the Supabase CA, so prod can only fail closed.
+drizzle-kit keeps `db:generate`. Same migrator (drizzle-orm's), migrations folder and journal.
+Why not drizzle-kit:
+- It loads `packages/db/.env` (dotenv) before reading the config, and `process.loadEnvFile` never overwrites a
+  variable already set. A config loading `.env.production` therefore still got the local `DATABASE_URL`, pointed the
+  prod TLS settings at local Docker ("server does not support SSL connections"), and drizzle-kit swallowed the error
+  (`renderWithTask` exits 1 without printing). Without the CA requirement it would have migrated the local DB and
+  reported success.
+- Making it work (`util.parseEnv`, URL split into fields because its `url` form takes no `ssl`) duplicates the TLS
+  setup from `createDb` and still prints nothing on failure.
+The script reuses `createDb`, the Lambda's connection path, and prints failures with the URL and password redacted.

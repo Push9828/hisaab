@@ -24,10 +24,12 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 const RUN_LOCK_KEY = 7_240_001;
 
 /**
- * Time spent waiting on the run lock counts as statement time, so this is
- * generous. It only stops a stuck statement from blocking forever.
+ * Time spent waiting on the run lock counts as statement time. It only stops a
+ * stuck statement from blocking forever, and must stay below the Lambda's 20s
+ * timeout. Set per transaction with SET LOCAL rather than as a connection
+ * startup parameter, which poolers such as Supavisor may reject.
  */
-const STATEMENT_TIMEOUT_MS = 30_000;
+const STATEMENT_TIMEOUT = '10s';
 
 /** pg's default (0) waits forever for a connection, e.g. to an unreachable host. */
 const CONNECT_TIMEOUT_MS = 5_000;
@@ -35,12 +37,24 @@ const CONNECT_TIMEOUT_MS = 5_000;
 /**
  * The caller owns `pool.end()`. Never pass Drizzle a `logger`: it prints query
  * parameters, which include message bodies (hard rule 8).
+ *
+ * With `ca`, the connection must use TLS and the server certificate must chain
+ * to `ca` and match the host name (libpq's verify-full). The URL must then
+ * carry no ssl* parameters: pg lets them replace the `ssl` option entirely.
  */
-export function createDb(connectionString: string): { db: Db; pool: pg.Pool } {
+export function createDb(
+  connectionString: string,
+  options: { ca?: string } = {},
+): { db: Db; pool: pg.Pool } {
+  if (options.ca !== undefined && /[?&]ssl/i.test(connectionString)) {
+    throw new Error(
+      'DATABASE_URL must not set ssl parameters when a CA is given',
+    );
+  }
   const pool = new pg.Pool({
     connectionString,
-    statement_timeout: STATEMENT_TIMEOUT_MS,
     connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    ...(options.ca !== undefined && { ssl: { ca: options.ca } }),
   });
   return { db: drizzle(pool), pool };
 }
@@ -54,6 +68,9 @@ export class DrizzleStore implements LedgerStore {
 
   run<T>(fn: (txn: LedgerTxn) => Promise<T>): Promise<T> {
     return this.db.transaction(async (tx) => {
+      await tx.execute(
+        sql.raw(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT}'`),
+      );
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${RUN_LOCK_KEY})`);
       return fn(handle(tx));
     });

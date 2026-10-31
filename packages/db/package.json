@@ -6,14 +6,16 @@
   "main": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
+    "db:migrate:prod": "tsx --env-file=.env.production scripts/migrate.ts",
     "db:generate": "drizzle-kit generate",
     "db:up": "docker compose -f ../../docker-compose.yml --env-file .env up -d --wait",
     "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",
-    "drizzle-kit": "0.31.11"
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15"
   },
   "dependencies": {
     "@hisaab/core": "workspace:*",
