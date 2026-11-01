@@ -17,6 +17,12 @@ export {
 } from './ledger';
 export { formatInr, parseAmount, type Paise } from './money';
 export { reply } from './reply';
+export {
+  spendByCategory,
+  UNCATEGORISED,
+  type CategorySpend,
+  type ReportTx,
+} from './reports';
 export type { LedgerStore, LedgerTxn, MessageMeta, NewAccount } from './store';
 export type {
   AccountInfo,
