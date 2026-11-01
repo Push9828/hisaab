@@ -11,5 +11,7 @@ export default defineConfig({
     name: '@hisaab/db',
     include: ['test/**/*.test.ts'],
     globalSetup: ['./test/global-setup.ts'],
+    // Test files share one database and truncate it between tests.
+    fileParallelism: false,
   },
 });

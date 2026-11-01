@@ -1,12 +1,12 @@
-import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
 import { parseDatabaseUrl } from './database-url';
+import { accountsWithBalances, setStatementTimeout, type Tx } from './reads';
 import { accounts, entries, processedMessages, transactions } from './schema';
 
 import type {
-  AccountInfo,
   LedgerStore,
   LedgerTxn,
   MessageMeta,
@@ -15,7 +15,6 @@ import type {
 } from '@hisaab/core';
 
 export type Db = NodePgDatabase;
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /**
  * Every run takes this lock first, so runs queue up one at a time like
@@ -23,15 +22,6 @@ type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
  * same "latest" row. The key is arbitrary but fixed.
  */
 const RUN_LOCK_KEY = 7_240_001;
-
-/**
- * Per statement, not per run: it stops one stuck statement (including a wait
- * on the run lock) from blocking forever. A run issues several statements, so
- * the Lambda's 20s timeout is the overall bound. Set per transaction with
- * SET LOCAL rather than as a connection startup parameter, which poolers such
- * as Supavisor may reject.
- */
-const STATEMENT_TIMEOUT = '10s';
 
 /** pg's default (0) waits forever for a connection, e.g. to an unreachable host. */
 const CONNECT_TIMEOUT_MS = 5_000;
@@ -67,9 +57,7 @@ export class DrizzleStore implements LedgerStore {
 
   run<T>(fn: (txn: LedgerTxn) => Promise<T>): Promise<T> {
     return this.db.transaction(async (tx) => {
-      await tx.execute(
-        sql.raw(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT}'`),
-      );
+      await setStatementTimeout(tx);
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${RUN_LOCK_KEY})`);
       return fn(handle(tx));
     });
@@ -101,31 +89,7 @@ function handle(tx: Tx): LedgerTxn {
       return rows.length === 1;
     },
 
-    async accounts(): Promise<AccountInfo[]> {
-      const rows = await tx
-        .select()
-        .from(accounts)
-        .orderBy(asc(accounts.createdAt), asc(accounts.id));
-      // sum(bigint) is numeric, which pg returns as a string. Parse it as a
-      // BigInt; never go through Number.
-      const sums = await tx
-        .select({
-          accountId: entries.accountId,
-          total: sql<string>`sum(${entries.amount})`,
-        })
-        .from(entries)
-        .innerJoin(transactions, eq(entries.transactionId, transactions.id))
-        .where(isNull(transactions.voidedAt))
-        .groupBy(entries.accountId);
-      const sumOf = new Map(sums.map((s) => [s.accountId, BigInt(s.total)]));
-      return rows.map((a) => ({
-        id: a.id,
-        alias: a.alias,
-        name: a.name,
-        kind: a.kind,
-        balance: a.openingBalance + (sumOf.get(a.id) ?? 0n),
-      }));
-    },
+    accounts: () => accountsWithBalances(tx),
 
     async createAccount(account: NewAccount) {
       await tx.insert(accounts).values({
