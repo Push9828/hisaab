@@ -18,9 +18,16 @@ export {
 export { formatInr, parseAmount, type Paise } from './money';
 export { reply } from './reply';
 export {
+  balancesByKind,
+  cashFlow,
+  people,
   spendByCategory,
   UNCATEGORISED,
+  type CashFlow,
   type CategorySpend,
+  type KindBalances,
+  type NamedAmount,
+  type People,
   type ReportTx,
 } from './reports';
 export type { LedgerStore, LedgerTxn, MessageMeta, NewAccount } from './store';
