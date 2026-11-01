@@ -8,8 +8,10 @@ Personal finance visibility. Existing expense apps fail because manual entry is
 friction and gets skipped. Logging by chat message ("petrol 4k cc icici") is the
 lowest-friction input. A dashboard turns the log into cash-flow visibility.
 
-Secondary goal: a portfolio piece with HLD/LLD write-ups. The public version
-uses **seeded fake data only**. Real data never leaves the private deployment.
+Secondary goal: a portfolio piece with HLD/LLD write-ups. The public version is
+the source code: anyone can run their own single-user copy with their own tokens
+and accounts. There is no hosted public instance. Portfolio screenshots use
+**seeded fake data only**. Real data never leaves the private deployment.
 
 ## 2. Goals (v1)
 
@@ -21,7 +23,7 @@ uses **seeded fake data only**. Real data never leaves the private deployment.
 
 ## 3. Non-goals (v1). Do not build these.
 
-- Multi-user, signup, public hosting, billing.
+- Multi-user, signup, a hosted public instance, billing.
 - Multi-currency. INR only.
 - Budgets, goals, forecasting, notifications that the bot initiates.
 - Splitwise sync (planned v2, read-only, see section 11).
@@ -59,6 +61,23 @@ Balance = openingBalance + sum(entries) on non-voided transactions.
 The spending report sums `spendAmount` on non-voided transactions. Transfers and
 adjustments always have `spendAmount = 0`. This single rule is what keeps credit
 card bill payments and internal transfers out of spending.
+
+**Monthly reports** cover one calendar month in IST (`occurredAt` in a half-open range) and
+exclude voided transactions.
+
+- **Spend by category**: sum of `spendAmount` per category. A null category (`NEEDS_REVIEW`)
+  goes in "Uncategorised", so the category total always equals total spend.
+- **Cash flow**: in = sum of INCOME entry amounts; out = sum of `spendAmount`; net = in - out.
+  ADJUSTMENT amounts are shown as a separate "reconcile corrections" line, outside net.
+  - A card spend counts in out when you swipe. It lowers the card balance, not a bank balance.
+  - A card bill payment lowers the bank account named in the message and clears the card
+    (example 2). It adds nothing to out, because the spend was already counted at the swipe.
+  - A SPLIT counts only your share. `lend` and `got` count nothing: the money is still yours.
+  - An EMI counts in full (see section 12), and the dashboard says so.
+  - Examples 1-8 in section 5 give in 85,000, out 38,000, net 47,000, corrections +800.
+- **People**: "owes me" lists RECEIVABLE accounts with a balance above zero. "I owe" lists PAYABLE
+  accounts with a balance and RECEIVABLE accounts below zero (an overpaid `got`). Zero balances
+  are hidden, and each side has a total.
 
 **Invariants** (these become property tests)
 1. Money amounts are positive integers. Direction comes from type and accounts.
@@ -244,6 +263,10 @@ identity `seq`), `schema.ts` is the truth.
 - Idempotency via the `ProcessedMessage` primary key (channel, externalId), with the unique on `Transaction` as a backstop. Channels retry.
 - Secrets in environment or AWS Secrets Manager. Never in the repo. `.env` is gitignored.
 - Dashboard requires auth. It is financial data on a public URL.
+- Every dashboard read checks the session and the email allowlist on the server. Middleware is not the security boundary.
+- The dashboard is server-rendered and read-only: no data API routes, no financial JSON sent to browser code, responses are `no-store`.
+- The dashboard connects as its own database role, which cannot write to the ledger and cannot read `rawText` or `ProcessedMessage`. It reads and writes only `better_auth` for sign-in.
+- Production secrets are set for Vercel's Production environment only, so a preview deployment cannot reach real data.
 - Logs must not contain full message bodies or balances.
 - The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
 - The bot token is never given to the Lambda: replies go back in the webhook response, so only the
@@ -278,6 +301,8 @@ is enough.
 - **EMI as an expense** overstates spending relative to economics and leaves loan
   balance and net worth stale. Fix in v2 by splitting principal (transfer to LOAN
   account) from interest (expense).
+- **Correcting older transactions**: `NEEDS_REVIEW` rows cannot be given a category, and `undo` only voids the
+  latest transaction. Deferred until after M5; see DECISIONS.md (2026-11-01).
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
 - Omitted account: DECIDED, reply with a clarifying question, write nothing.
 - Category list: DECIDED, fixed list in section 6. Add keywords as real use shows gaps.

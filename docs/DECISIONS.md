@@ -320,3 +320,55 @@ token rotation updates both files.
 
 **Supabase's Data API is off (confirmed in the dashboard, 2026-10-31).** Why: Drizzle creates the tables in `public`, which Supabase publishes over
 PostgREST to the `anon` role by default. Hisaab only connects over Postgres, so the API is pure exposure.
+
+## 2026-11-01
+
+**Deferred: correcting older transactions. Not in M5; the M5 dashboard stays read-only.** Why: there are two real gaps,
+but how often they matter is unknown until the dashboard has been used for a few weeks. `NEEDS_REVIEW` rows have no
+way to get a category, and `undo` only voids the latest transaction, so an older mistake means undoing everything
+after it (`bal` corrects the balance but leaves the wrong row in reports).
+If real use justifies it, add only two actions: set a category, and void a specific transaction (re-enter through
+the bot if needed). No direct edits to amount, account or type: those carry the ledger rules, and void plus re-enter
+keeps a record of what changed. Try the bot first (e.g. `void 142`): it stays the only write path and adds no attack
+surface. Move to the dashboard only if picking rows by number proves annoying. Dashboard writes would need write
+access beyond the read-only role, server actions with CSRF protection, and must go through `core`, not direct SQL.
+
+**The "public version" is the source code, not a hosted instance.** Anyone can run their own single-user copy with
+their own tokens and accounts. Portfolio screenshots come from a local database seeded with fake data. Why: resolves
+the conflict between SPEC section 1 (public version) and section 3 (no public hosting). A hosted demo would need a
+second deployment, and a no-login demo mode is one wrong env var away from exposing real data. Consequence: emails,
+sender ids and hostnames stay in env vars. Making the repo public is a separate step outside M5, and needs a scan of
+the git history for secrets and personal data first.
+
+**Cash flow: in = INCOME, out = `spendAmount`, net = in - out, per IST month; shown for the selected month plus a
+6-month table.** Definition in SPEC section 4. Why: out then always equals the spend report. A card spend lowers the
+card when you swipe; paying the bill lowers the bank account named in the message and clears the card, and adds
+nothing to out, because counting both would double count. ADJUSTMENT is a separate line outside net: it corrects
+drift and is neither income nor spending. Rejected: bank-only cash movement, which counts the bill when paid, counts
+lending as out, ignores card spend and so disagrees with the spend report.
+
+**The People panel shows both "owes me" and "I owe".** Overpaid receivables go under "I owe"; zero balances are hidden.
+Why: showing only receivables would make what you owe invisible.
+
+**Uncategorised spend is shown as an "Uncategorised" bucket.** Why: `NEEDS_REVIEW` rows have real `spendAmount`, and
+leaving them out would make category totals disagree with total spend.
+
+**The dashboard is hosted on Vercel, function region `bom1` (Mumbai), with preview deployments off and env vars
+scoped to Production only.** Why: easiest setup, and the region is next to Supabase Mumbai (Hobby allows one function
+region; new projects default to `iad1`, so it must be set). A preview URL holding production env vars would be a
+second door to real data. Connects through the Session pooler, as the Lambda does, because there is no IPv6 egress.
+
+**Better Auth sessions are stored in the database, in a `better_auth` Postgres schema.** Why: server-side sessions
+make "sign out everywhere" work after a lost laptop; cookie-only sessions cannot be revoked. Not the `auth` schema,
+which Supabase owns. A separate schema also keeps Better Auth's `account` table visibly apart from our `Account`.
+
+**The dashboard uses a least-privilege role, `hisaab_dashboard`.** `SELECT` on `Account`, `Entry` and `Transaction`
+excluding `rawText`; nothing on `ProcessedMessage`; read/write only on `better_auth`. Own password, dashboard env
+only, created by a hand-run script, not a committed migration. Why: a dashboard bug or leaked credential then cannot
+change the ledger or read raw messages. Open risk: Supabase's pooler with a custom role (`role.projectref` user name)
+is untested; steps 7 and 12 check it, and this gets revisited if it fails.
+
+**The dashboard keeps one module-level pool: `max: 1`, about 5s idle timeout, through `createDb`.** Reads run in a
+read-only transaction with `SET LOCAL statement_timeout` and no advisory lock. Why: server components have no natural
+per-request place to close a pool, and one connection is enough for one user. The advisory lock only serialises
+ledger writes, so reads do not need it.
