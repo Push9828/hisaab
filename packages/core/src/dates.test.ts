@@ -1,6 +1,13 @@
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { formatDay, parseDatePrefix } from './dates';
+import {
+  formatDay,
+  istMonthOf,
+  istMonthRange,
+  parseDatePrefix,
+  parseMonth,
+} from './dates';
 import { NOW } from './fixtures';
 
 const noonIst = (iso: string) => new Date(`${iso}T12:00:00+05:30`);
@@ -145,5 +152,109 @@ describe('parseDatePrefix', () => {
 describe('formatDay', () => {
   it('formats in IST', () => {
     expect(formatDay(noonIst('2026-10-20'))).toBe('20 Oct');
+  });
+});
+
+describe('istMonthOf', () => {
+  it('changes month at midnight IST, not UTC', () => {
+    expect(istMonthOf(new Date('2026-10-31T18:29:59.999Z'))).toEqual({
+      year: 2026,
+      month: 10,
+    });
+    expect(istMonthOf(new Date('2026-10-31T18:30:00.000Z'))).toEqual({
+      year: 2026,
+      month: 11,
+    });
+  });
+
+  it('changes year at midnight IST, not UTC', () => {
+    expect(istMonthOf(new Date('2026-12-31T18:30:00.000Z'))).toEqual({
+      year: 2027,
+      month: 1,
+    });
+  });
+});
+
+describe('istMonthRange', () => {
+  it('starts at midnight IST and ends at the next month start', () => {
+    expect(istMonthRange(2026, 10)).toEqual({
+      start: new Date('2026-09-30T18:30:00.000Z'),
+      end: new Date('2026-10-31T18:30:00.000Z'),
+    });
+  });
+
+  it('rolls December over to January', () => {
+    expect(istMonthRange(2026, 12)).toEqual({
+      start: new Date('2026-11-30T18:30:00.000Z'),
+      end: new Date('2026-12-31T18:30:00.000Z'),
+    });
+  });
+
+  it('covers a leap February', () => {
+    expect(istMonthRange(2028, 2)).toEqual({
+      start: new Date('2028-01-31T18:30:00.000Z'),
+      end: new Date('2028-02-29T18:30:00.000Z'),
+    });
+  });
+
+  it('puts every instant in exactly one month range', () => {
+    const inRange = (at: Date, { start, end }: { start: Date; end: Date }) =>
+      at >= start && at < end;
+
+    fc.assert(
+      fc.property(
+        fc.date({
+          min: new Date('2000-01-01T00:00:00.000Z'),
+          max: new Date('2099-12-31T00:00:00.000Z'),
+          noInvalidDate: true,
+        }),
+        (at) => {
+          const { year, month } = istMonthOf(at);
+          const range = istMonthRange(year, month);
+          expect(inRange(at, range)).toBe(true);
+
+          const previous =
+            month === 1
+              ? istMonthRange(year - 1, 12)
+              : istMonthRange(year, month - 1);
+          const next =
+            month === 12
+              ? istMonthRange(year + 1, 1)
+              : istMonthRange(year, month + 1);
+          expect(inRange(at, previous)).toBe(false);
+          expect(inRange(at, next)).toBe(false);
+          expect(previous.end).toEqual(range.start);
+          expect(range.end).toEqual(next.start);
+        },
+      ),
+      { numRuns: 2000 },
+    );
+  });
+});
+
+describe('parseMonth', () => {
+  it('reads YYYY-MM', () => {
+    expect(parseMonth('2026-10')).toEqual({ year: 2026, month: 10 });
+    expect(parseMonth('2027-01')).toEqual({ year: 2027, month: 1 });
+  });
+
+  it.each([
+    '',
+    '2026',
+    '2026-1',
+    '2026-00',
+    '2026-13',
+    '2026-010',
+    '26-10',
+    '1999-10',
+    '0050-10',
+    '2026/10',
+    ' 2026-10',
+    '2026-10 ',
+    '2026-10\n',
+    '2026-10-01',
+    'oct',
+  ])('rejects %j', (value) => {
+    expect(parseMonth(value)).toBeNull();
   });
 });

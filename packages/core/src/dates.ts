@@ -59,6 +59,33 @@ export function formatDay(date: Date): string {
 const noonIst = ({ year, month, day }: Day): Date =>
   new Date(Date.UTC(year, month - 1, day, 12, 0) - IST_OFFSET_MS);
 
+export interface Month {
+  year: number;
+  month: number; // 1-12
+}
+
+export interface DateRange {
+  start: Date; // inclusive
+  end: Date; // exclusive
+}
+
+export function istMonthOf(date: Date): Month {
+  const { year, month } = istDay(date);
+  return { year, month };
+}
+
+export const istMonthRange = (year: number, month: number): DateRange => ({
+  start: new Date(Date.UTC(year, month - 1, 1) - IST_OFFSET_MS),
+  end: new Date(Date.UTC(year, month, 1) - IST_OFFSET_MS),
+});
+
+/** Reads a strict YYYY-MM. Accepts only 20xx, as the date prefix does. */
+export function parseMonth(value: string): Month | null {
+  const match = /^(20\d{2})-(0[1-9]|1[0-2])$/.exec(value);
+  if (!match) return null;
+  return { year: Number(match[1]), month: Number(match[2]) };
+}
+
 export const isMonthName = (token: string): boolean => monthIndex(token) !== -1;
 
 function monthIndex(token: string): number {

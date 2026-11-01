@@ -1,4 +1,11 @@
 export { CATEGORIES, type Category } from './categories';
+export {
+  istMonthOf,
+  istMonthRange,
+  parseMonth,
+  type DateRange,
+  type Month,
+} from './dates';
 export { ingest, type IncomingMessage, type IngestResult } from './ingest';
 export { interpret } from './interpret';
 export { MemoryStore, type MemoryAccount } from './memory-store';
