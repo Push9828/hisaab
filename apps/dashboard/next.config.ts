@@ -8,7 +8,8 @@ const contentSecurityPolicy = [
   "style-src 'self'",
   "img-src 'self'",
   "base-uri 'none'",
-  "form-action 'self'",
+  // Chrome also applies this to redirects, and sign-in redirects to Google.
+  "form-action 'self' https://accounts.google.com",
   "frame-ancestors 'none'",
 ].join('; ');
 
@@ -20,7 +21,9 @@ const config: NextConfig = {
       source: '/:path*',
       headers: [
         { key: 'Content-Security-Policy', value: contentSecurityPolicy },
-        { key: 'Referrer-Policy', value: 'no-referrer' },
+        // Not no-referrer: that makes browsers send `Origin: null` on form posts,
+        // which fails the server action origin check.
+        { key: 'Referrer-Policy', value: 'same-origin' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'X-Robots-Tag', value: 'noindex, nofollow' },
       ],

@@ -387,3 +387,15 @@ sign-in, the month picker and error pages must work without JavaScript; `error.t
 run; style attributes are blocked too, so report bars cannot use inline widths. Rejected: nonces, which need a proxy on
 every request and would allow the framework's scripts we do not use; `'unsafe-inline'`, which removes the protection.
 If a page ever needs client code, this is the decision to revisit.
+
+**Sign-in and sign-out are server actions, and the only Better Auth URL exposed is `GET /api/auth/callback/google`.**
+Why: Better Auth's own sign-in endpoint takes JSON, which a form without JavaScript cannot send, and exposing only the
+callback leaves its other endpoints unreachable. Two headers follow from this, both confirmed in Chrome by removing each
+one: `Referrer-Policy` is `same-origin`, because `no-referrer` makes form posts carry `Origin: null` and fail the server
+action origin check; `form-action` allows `https://accounts.google.com`, because Chrome applies it to the redirect.
+Rejected: a catch-all `[...all]` route, which would expose every endpoint for no use here.
+
+**Sign-out ends every session, and a session lasts a fixed 7 days with no refresh.** Why: with one user, a lost laptop
+is the main reason to sign out. Refreshing would write during page reads, and a page render cannot set the new cookie
+anyway. Google's OAuth tokens are never used, but Better Auth stores them, so they are encrypted with
+`encryptOAuthTokens`.

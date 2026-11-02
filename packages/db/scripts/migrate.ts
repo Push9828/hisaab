@@ -1,6 +1,6 @@
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 
-import { parseDatabaseUrl } from '../src/database-url';
+import { isLocalDatabaseUrl, parseDatabaseUrl } from '../src/database-url';
 import { createDb } from '../src/drizzle-store';
 import { SUPABASE_ROOT_CA } from '../src/supabase-ca';
 
@@ -10,8 +10,6 @@ import { SUPABASE_ROOT_CA } from '../src/supabase-ca';
  * `drizzle-kit migrate`: it loads .env before its config, so it cannot be
  * pointed at prod reliably, and it exits 1 without printing the error.
  */
-const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
-
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
 
@@ -21,7 +19,7 @@ const parsed = parseDatabaseUrl(url);
 
 // Local Docker has no TLS. Anything else must be Supabase with a verified
 // certificate, so a wrong URL fails instead of connecting in plaintext.
-const local = LOCAL_HOSTS.has(parsed.hostname);
+const local = isLocalDatabaseUrl(url);
 const { db, pool } = createDb(url, local ? {} : { ca: SUPABASE_ROOT_CA });
 try {
   await migrate(db, { migrationsFolder: 'drizzle' });

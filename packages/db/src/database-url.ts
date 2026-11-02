@@ -24,3 +24,9 @@ export function parseDatabaseUrl(url: string): URL {
   }
   return parsed;
 }
+
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+/** parseDatabaseUrl rejects ?host= and ?port=, so this is the host pg connects to. */
+export const isLocalDatabaseUrl = (url: string): boolean =>
+  LOCAL_HOSTS.has(parseDatabaseUrl(url).hostname);

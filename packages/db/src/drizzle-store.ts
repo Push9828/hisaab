@@ -36,13 +36,16 @@ const CONNECT_TIMEOUT_MS = 5_000;
  */
 export function createDb(
   connectionString: string,
-  options: { ca?: string; max?: number } = {},
+  options: { ca?: string; max?: number; idleTimeoutMillis?: number } = {},
 ): { db: Db; pool: pg.Pool } {
   parseDatabaseUrl(connectionString);
   const pool = new pg.Pool({
     connectionString,
     connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
     ...(options.max !== undefined && { max: options.max }),
+    ...(options.idleTimeoutMillis !== undefined && {
+      idleTimeoutMillis: options.idleTimeoutMillis,
+    }),
     ...(options.ca !== undefined && { ssl: { ca: options.ca } }),
   });
   return { db: drizzle(pool), pool };
