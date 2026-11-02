@@ -134,6 +134,46 @@ describe('hisaab_dashboard can do what the dashboard needs', () => {
   });
 });
 
+describe('row-level security', () => {
+  it.each(['Account', 'Entry', 'Transaction', 'ProcessedMessage'])(
+    '%s has it on, so no role gets rows without a policy',
+    async (table) => {
+      const { rows } = await admin.pool.query(
+        'SELECT relrowsecurity AS rls FROM pg_class WHERE oid = $1::regclass',
+        [`"${table}"`],
+      );
+      expect(rows).toEqual([{ rls: true }]);
+    },
+  );
+
+  it('lets hisaab_dashboard see rows, instead of silently showing nothing', async () => {
+    expect(
+      await role.db.select({ id: accounts.id }).from(accounts),
+    ).toHaveLength(1);
+    expect(
+      await role.db.select({ id: entries.transactionId }).from(entries),
+    ).toHaveLength(1);
+    expect(await readTransactions(role.db, OCTOBER)).toHaveLength(1);
+  });
+
+  it('gives a role with table access but no policy nothing', async () => {
+    const client = await admin.pool.connect();
+    try {
+      await client.query('DROP ROLE IF EXISTS sim_anon');
+      await client.query('CREATE ROLE sim_anon NOLOGIN');
+      await client.query('GRANT SELECT ON "Account" TO sim_anon');
+      await client.query('SET ROLE sim_anon');
+      const { rows } = await client.query('SELECT * FROM "Account"');
+      expect(rows).toEqual([]);
+    } finally {
+      await client.query('RESET ROLE');
+      await client.query('REVOKE ALL ON "Account" FROM sim_anon');
+      await client.query('DROP ROLE sim_anon');
+      client.release();
+    }
+  });
+});
+
 describe('hisaab_dashboard cannot change the ledger', () => {
   it.each([
     [

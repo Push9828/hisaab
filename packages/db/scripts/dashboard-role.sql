@@ -48,6 +48,15 @@ GRANT SELECT (
   "id", "type", "occurredAt", "category", "spendAmount", "voidedAt", "seq"
 ) ON "Transaction" TO hisaab_dashboard;
 
+-- Row-level security is on for the ledger (migration 0002), so without these the role
+-- would read zero rows and the dashboard would show 0 with no error. Reading only.
+DROP POLICY IF EXISTS dashboard_read ON "Account";
+DROP POLICY IF EXISTS dashboard_read ON "Entry";
+DROP POLICY IF EXISTS dashboard_read ON "Transaction";
+CREATE POLICY dashboard_read ON "Account" FOR SELECT TO hisaab_dashboard USING (true);
+CREATE POLICY dashboard_read ON "Entry" FOR SELECT TO hisaab_dashboard USING (true);
+CREATE POLICY dashboard_read ON "Transaction" FOR SELECT TO hisaab_dashboard USING (true);
+
 -- Sign-in: read and write rows, but not change the tables.
 GRANT USAGE ON SCHEMA better_auth TO hisaab_dashboard;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA better_auth

@@ -435,3 +435,10 @@ rewritten to GitHub's noreply address, and a fresh scan.
 attribute may change it, so `ALTER ROLE ... NOSUPERUSER` fails for an admin who is not a superuser, which is what Supabase's
 `postgres` is expected to be. `CREATE ROLE` leaves them all off, and the script now stops if any has been switched on.
 
+**Row-level security is on for all ledger tables, in a migration, and `hisaab_dashboard` reads through a `SELECT`-only policy.**
+Production already had it on with no policies, which is what keeps Supabase's `anon` and `authenticated` roles out even
+though they hold table grants. Nothing in the repo recorded that, so migration 0002 now does, and local tests run the same
+way (it is a no-op on production). The side effect: a non-owner role reads zero rows with no error, so the dashboard would
+have shown 0 everywhere. Rejected: `BYPASSRLS` for the role, which would remove the protection for it entirely. The bot's
+role owns the tables, so it is exempt and unaffected.
+

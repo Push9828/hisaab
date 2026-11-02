@@ -47,7 +47,7 @@ export const accounts = pgTable('Account', {
     .notNull()
     .default(sql`0`),
   createdAt: instant('createdAt').notNull().defaultNow(),
-});
+}).enableRLS();
 
 export const transactions = pgTable(
   'Transaction',
@@ -81,7 +81,7 @@ export const transactions = pgTable(
       sql`${t.type} NOT IN ('TRANSFER', 'ADJUSTMENT', 'INCOME') OR ${t.spendAmount} = 0`,
     ),
   ],
-);
+).enableRLS();
 
 export const entries = pgTable(
   'Entry',
@@ -101,7 +101,7 @@ export const entries = pgTable(
     // Direction is the sign; a zero entry is meaningless.
     check('Entry_amount_nonzero', sql`${t.amount} <> 0`),
   ],
-);
+).enableRLS();
 
 // One row per processed message that wrote something, claimed in the same DB
 // transaction as the write. Covers `undo` and `open`, which create no Transaction.
@@ -113,4 +113,4 @@ export const processedMessages = pgTable(
     createdAt: instant('createdAt').notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.channel, t.externalId] })],
-);
+).enableRLS();
