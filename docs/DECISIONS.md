@@ -362,11 +362,15 @@ second door to real data. Connects through the Session pooler, as the Lambda doe
 make "sign out everywhere" work after a lost laptop; cookie-only sessions cannot be revoked. Not the `auth` schema,
 which Supabase owns. A separate schema also keeps Better Auth's `account` table visibly apart from our `Account`.
 
-**The dashboard uses a least-privilege role, `hisaab_dashboard`.** `SELECT` on `Account`, `Entry` and `Transaction`
-excluding `rawText`; nothing on `ProcessedMessage`; read/write only on `better_auth`. Own password, dashboard env
-only, created by a hand-run script, not a committed migration. Why: a dashboard bug or leaked credential then cannot
-change the ledger or read raw messages. Open risk: Supabase's pooler with a custom role (`role.projectref` user name)
-is untested; steps 7 and 12 check it, and this gets revisited if it fails.
+**The dashboard uses a least-privilege role, `hisaab_dashboard`.** `SELECT` on `Account` and `Entry`; on `Transaction`
+only the columns the reports use, so no `rawText`, `description`, `channel` or `externalId`; nothing on
+`ProcessedMessage`; read/write rows only on `better_auth`. Own password, dashboard env only, created by a hand-run
+script (`packages/db/scripts/dashboard-role.sql`), not a committed migration. Why: a dashboard bug or leaked credential
+then cannot change the ledger or read message text. A future transaction list would need `description` granted, as an
+explicit change. The script sets no password: `\password` in psql hashes it on the client, whereas a psql variable
+would send plain text in an `ALTER ROLE` that can reach server logs and query statistics. Open risk: Supabase's pooler
+with a custom role (`role.projectref` user name) is untested, because the tests run on local Docker. Step 12 checks
+it, and this gets revisited if it fails.
 
 **The dashboard keeps one module-level pool: `max: 1`, about 5s idle timeout, through `createDb`.** Reads run in a
 read-only transaction with `SET LOCAL statement_timeout` and no advisory lock. Why: server components have no natural

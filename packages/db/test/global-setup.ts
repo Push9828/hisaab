@@ -4,9 +4,14 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 
-import { assertTestDatabaseUrl } from './test-db';
+import {
+  applyDashboardRole,
+  assertTestDatabaseUrl,
+  setDashboardRolePassword,
+} from './test-db';
 
-// Creates the test database if needed and brings it to the current migrations.
+// Creates the test database if needed, brings it to the current migrations and
+// sets up the dashboard's role.
 export default async function setup() {
   const url = assertTestDatabaseUrl(process.env.TEST_DATABASE_URL);
   const name = url.pathname.slice(1);
@@ -32,6 +37,8 @@ export default async function setup() {
     await migrate(drizzle(pool), {
       migrationsFolder: fileURLToPath(new URL('../drizzle', import.meta.url)),
     });
+    await applyDashboardRole(pool);
+    await setDashboardRolePassword(pool, url);
   } finally {
     await pool.end();
   }
