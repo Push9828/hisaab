@@ -368,9 +368,8 @@ only the columns the reports use, so no `rawText`, `description`, `channel` or `
 script (`packages/db/scripts/dashboard-role.sql`), not a committed migration. Why: a dashboard bug or leaked credential
 then cannot change the ledger or read message text. A future transaction list would need `description` granted, as an
 explicit change. The script sets no password: `\password` in psql hashes it on the client, whereas a psql variable
-would send plain text in an `ALTER ROLE` that can reach server logs and query statistics. Open risk: Supabase's pooler
-with a custom role (`role.projectref` user name) is untested, because the tests run on local Docker. Step 12 checks
-it, and this gets revisited if it fails.
+would send plain text in an `ALTER ROLE` that can reach server logs and query statistics. Supabase's Session pooler accepts
+the custom role as `hisaab_dashboard.<project-ref>`, checked on production with `pnpm db:check:role:prod` (2026-11-02).
 
 **The dashboard keeps one module-level pool: `max: 1`, about 5s idle timeout, through `createDb`.** Reads run in a
 read-only transaction with `SET LOCAL statement_timeout` and no advisory lock. Why: server components have no natural

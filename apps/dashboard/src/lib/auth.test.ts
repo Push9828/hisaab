@@ -103,6 +103,27 @@ describe('Google sign-in', () => {
   });
 });
 
+describe('BETTER_AUTH_URL with a trailing slash', () => {
+  it('still sends a failed callback to /sign-in', async () => {
+    const auth = createAuth(
+      memoryAdapter({ user: [], session: [], account: [], verification: [] }),
+      {
+        allowedEmails: 'owner@example.com',
+        baseURL: 'http://localhost:3000/',
+        secret: 'a-fake-secret-for-tests-only-0123456789',
+        googleClientId: 'fake-id',
+        googleClientSecret: 'fake-secret',
+      },
+    );
+    const response = await auth.handler(
+      new Request('http://localhost:3000/api/auth/callback/google?code=x'),
+    );
+    expect(new URL(response.headers.get('location')!).pathname).toBe(
+      '/sign-in',
+    );
+  });
+});
+
 describe('Better Auth logging', () => {
   it('prints fixed text: its messages can hold query parameters', async () => {
     const { auth } = await setup();

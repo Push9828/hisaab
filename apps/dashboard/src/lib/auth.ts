@@ -50,7 +50,7 @@ export function createAuth(
       disableSessionRefresh: true,
     },
     // The fallback for a callback that fails before its state is read.
-    onAPIError: { errorURL: `${env.baseURL}/sign-in` },
+    onAPIError: { errorURL: new URL('/sign-in', env.baseURL).toString() },
     databaseHooks: {
       user: {
         create: {
