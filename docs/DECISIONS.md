@@ -409,3 +409,8 @@ Rejected: `error.tsx`, the plan's choice, which is a client component and cannot
 **Report bars are SVG rectangles with a percentage `width` attribute.** Why: the CSP blocks inline styles, and an SVG
 attribute is not a style. Rejected: `<meter>`, which is styled differently in each browser. Every bar has its amount
 beside it as text, so there is no hover tooltip to miss.
+
+**Fake data goes in its own local database, `hisaab_demo`, never the dev database.** Why: the dev database can hold what
+the bot wrote locally, and fake rows mixed into it could not be told apart or removed, since nothing is hard-deleted. The
+seed goes through `ingest`, with fixed ids so a second run is a no-op, and refuses a non-local `DATABASE_URL`. Dates are
+fixed rather than relative to today, so screenshots repeat; open `/?month=2026-10` to see them.

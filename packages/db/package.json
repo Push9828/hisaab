@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "db:migrate": "tsx --env-file=.env scripts/migrate.ts",
     "db:migrate:prod": "tsx --env-file=.env.production scripts/migrate.ts",
+    "db:seed": "tsx --env-file=.env scripts/seed-fake.ts",
     "db:generate": "drizzle-kit generate",
     "db:up": "docker compose -f ../../docker-compose.yml --env-file .env up -d --wait",
     "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"
