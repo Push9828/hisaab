@@ -10,6 +10,7 @@ export default config(
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
+      '**/next-env.d.ts',
       '**/coverage/**',
     ],
   },

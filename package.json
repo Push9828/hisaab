@@ -11,6 +11,7 @@
     "test:core": "vitest run --project @hisaab/core",
     "test:db": "vitest run --project @hisaab/db",
     "test:adapter": "vitest run --project @hisaab/adapter",
+    "test:dashboard": "vitest run --project @hisaab/dashboard",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",

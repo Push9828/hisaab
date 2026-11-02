@@ -5,6 +5,8 @@ node_modules
 dist
 .aws-sam
 .next
+next-env.d.ts
+apps/dashboard/AGENTS.md
 coverage
 *.tsbuildinfo
 .DS_Store

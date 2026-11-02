@@ -376,3 +376,14 @@ it, and this gets revisited if it fails.
 read-only transaction with `SET LOCAL statement_timeout` and no advisory lock. Why: server components have no natural
 per-request place to close a pool, and one connection is enough for one user. The advisory lock only serialises
 ledger writes, so reads do not need it.
+
+## 2026-11-02
+
+**The dashboard's CSP is `script-src 'none'`: the browser runs no JavaScript at all.** Why: the pages are server-rendered
+HTML with no client components, so nothing needs a script, and injected markup then cannot execute. Checked in Chrome
+against a production build, with a no-CSP control: an inline script ran without the header and was blocked with it.
+Next still sends its script tags, so the console logs a CSP violation for each one; that noise is expected. Consequences:
+sign-in, the month picker and error pages must work without JavaScript; `error.tsx` is a client component and will not
+run; style attributes are blocked too, so report bars cannot use inline widths. Rejected: nonces, which need a proxy on
+every request and would allow the framework's scripts we do not use; `'unsafe-inline'`, which removes the protection.
+If a page ever needs client code, this is the decision to revisit.
