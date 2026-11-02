@@ -156,6 +156,14 @@ describe('row-level security', () => {
     expect(await readTransactions(role.db, OCTOBER)).toHaveLength(1);
   });
 
+  it('is on for every table in public, so a new table cannot forget it', async () => {
+    const { rows } = await admin.pool.query(`
+      SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
+    `);
+    expect(rows).toEqual([]);
+  });
+
   it('gives a role with table access but no policy nothing', async () => {
     const client = await admin.pool.connect();
     try {
@@ -281,6 +289,25 @@ describe('hisaab_dashboard cannot widen its own access', () => {
     expect(await failure(role.db.execute(query))).toBeDefined();
   });
 
+  it('cannot read a column added to the ledger later', async () => {
+    for (const table of ['Account', 'Entry']) {
+      await admin.db.execute(
+        sql.raw(`ALTER TABLE "${table}" ADD COLUMN later text`),
+      );
+      try {
+        expect(
+          await failure(
+            role.db.execute(sql.raw(`SELECT later FROM "${table}"`)),
+          ),
+        ).toBe(INSUFFICIENT_PRIVILEGE);
+      } finally {
+        await admin.db.execute(
+          sql.raw(`ALTER TABLE "${table}" DROP COLUMN later`),
+        );
+      }
+    }
+  });
+
   it('has no special role attributes', async () => {
     const result = await role.db.execute(sql`
       SELECT rolsuper, rolcreaterole, rolcreatedb, rolreplication, rolbypassrls
@@ -363,6 +390,30 @@ describe('dashboard-role.sql', () => {
       await admin.db.execute(sql`ALTER ROLE hisaab_dashboard NOCREATEDB`);
     }
     await applyDashboardRole(admin.pool);
+  });
+
+  it('refuses to finish if the role has been made a member of another role', async () => {
+    await admin.pool.query(`GRANT "${url.username}" TO hisaab_dashboard`);
+    try {
+      await expect(applyDashboardRole(admin.pool)).rejects.toThrow('member');
+    } finally {
+      await admin.pool.query('ROLLBACK').catch(() => {});
+      await admin.pool.query(`REVOKE "${url.username}" FROM hisaab_dashboard`);
+    }
+    await applyDashboardRole(admin.pool);
+  });
+
+  it('takes back a grant on any table in public, not only the known ones', async () => {
+    await admin.pool.query('CREATE TABLE later_table (id int)');
+    try {
+      await admin.pool.query('GRANT SELECT ON later_table TO hisaab_dashboard');
+      await applyDashboardRole(admin.pool);
+      expect(
+        await failure(role.db.execute(sql`SELECT * FROM later_table`)),
+      ).toBe(INSUFFICIENT_PRIVILEGE);
+    } finally {
+      await admin.pool.query('DROP TABLE later_table');
+    }
   });
 
   it('holds no password', async () => {

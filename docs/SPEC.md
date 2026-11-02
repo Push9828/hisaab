@@ -78,8 +78,8 @@ exclude voided transactions.
 - **Savings rate**: net / in for the month, from the cash flow above. It is negative when more went out
   than came in, and blank when there is no income. An EMI counts in full here too, so it understates
   real saving by the principal repaid.
-- **People**: "owes me" lists RECEIVABLE accounts with a balance above zero. "I owe" lists PAYABLE
-  accounts with a balance and RECEIVABLE accounts below zero (an overpaid `got`). Zero balances
+- **People**: by the sign of the balance. "Owes me" lists RECEIVABLE or PAYABLE accounts above zero, and
+  "I owe" lists those below zero (a PAYABLE, or an overpaid `got`). Zero balances
   are hidden, and each side has a total.
 
 **Invariants** (these become property tests)

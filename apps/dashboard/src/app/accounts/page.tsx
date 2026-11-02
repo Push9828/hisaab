@@ -49,8 +49,8 @@ export default async function Accounts(props: PageProps) {
       <div className="flex flex-col gap-4">
         {data.balances.length === 0 ? (
           <p className="glass p-6 text-soft">
-            No accounts yet. Create one with the bot, for example &quot;open
-            icici 50k bank&quot;.
+            No bank, card or loan accounts yet. Create one with the bot, for
+            example &quot;open icici 50k bank&quot;.
           </p>
         ) : (
           <StatRow>
@@ -107,9 +107,11 @@ export default async function Accounts(props: PageProps) {
                       <span className="-ml-2.5 size-6 rounded-full bg-white/35" />
                     </span>
                   </div>
-                  <p className="mt-10 text-xs text-[#d5e0ff]">Owed</p>
+                  <p className="mt-10 text-xs text-[#d5e0ff]">
+                    {card.amount < 0n ? 'In credit' : 'Owed'}
+                  </p>
                   <p className="mt-1 text-3xl font-extrabold tabular-nums">
-                    {inr(card.amount)}
+                    {inr(card.amount < 0n ? -card.amount : card.amount)}
                   </p>
                 </div>
               ))}

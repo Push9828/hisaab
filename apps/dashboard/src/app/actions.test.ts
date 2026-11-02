@@ -58,6 +58,13 @@ describe('signIn', () => {
     await expect(signIn()).rejects.toMatchObject({
       to: 'https://accounts.google.com/x',
     });
+    expect(mocks.signInSocial).toHaveBeenCalledWith({
+      body: {
+        provider: 'google',
+        callbackURL: '/',
+        errorCallbackURL: '/sign-in',
+      },
+    });
   });
 
   it('on failure shows the fixed message and logs no details', async () => {
@@ -72,6 +79,10 @@ describe('signOut', () => {
     await expect(signOut()).rejects.toMatchObject({ to: '/sign-in' });
     expect(mocks.revokeSessions).toHaveBeenCalledOnce();
     expect(mocks.signOut).toHaveBeenCalledOnce();
+    // The other way round, signOut deletes the session and revoking then fails.
+    expect(mocks.revokeSessions.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.signOut.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('lets the requireOwner redirect through', async () => {

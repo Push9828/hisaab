@@ -31,19 +31,29 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'hisaab_dashboard has a special attribute. Remove it first.';
   END IF;
+  IF EXISTS (
+    SELECT FROM pg_auth_members
+    WHERE member = 'hisaab_dashboard'::regrole
+  ) THEN
+    RAISE EXCEPTION 'hisaab_dashboard is a member of another role. Remove it first.';
+  END IF;
 END
 $$;
 
 -- Start from nothing. Revoking at table level also removes column grants.
-REVOKE ALL ON "Account", "Entry", "Transaction", "ProcessedMessage"
-  FROM hisaab_dashboard;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM hisaab_dashboard;
 REVOKE ALL ON ALL TABLES IN SCHEMA better_auth FROM hisaab_dashboard;
 REVOKE ALL ON SCHEMA public, better_auth FROM hisaab_dashboard;
 
 -- The ledger: read only, and only what the reports use. No "rawText", "description",
 -- "channel" or "externalId", and nothing at all on "ProcessedMessage".
 GRANT USAGE ON SCHEMA public TO hisaab_dashboard;
-GRANT SELECT ON "Account", "Entry" TO hisaab_dashboard;
+-- Column by column, so a column added later is unreadable until granted here.
+GRANT SELECT (
+  "id", "alias", "name", "kind", "openingBalance", "createdAt"
+) ON "Account" TO hisaab_dashboard;
+GRANT SELECT ("id", "transactionId", "accountId", "amount") ON "Entry"
+  TO hisaab_dashboard;
 GRANT SELECT (
   "id", "type", "occurredAt", "category", "spendAmount", "voidedAt", "seq"
 ) ON "Transaction" TO hisaab_dashboard;

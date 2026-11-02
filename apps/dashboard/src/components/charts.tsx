@@ -229,7 +229,11 @@ export function SavingsGauge({ rate }: { rate: number | null }) {
           {rate === null ? '—' : percent(rate)}
         </p>
         <p className="mt-1 text-xs text-soft">
-          {rate === null ? 'No income logged' : 'of income kept'}
+          {rate === null
+            ? 'No income logged'
+            : rate < 0
+              ? 'more went out than came in'
+              : 'of income kept'}
         </p>
       </div>
     </div>

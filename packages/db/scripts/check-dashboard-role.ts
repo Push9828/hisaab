@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 import { verification } from '../src/auth-schema';
 import { isLocalDatabaseUrl, parseDatabaseUrl } from '../src/database-url';
@@ -8,8 +8,9 @@ import { SUPABASE_ROOT_CA } from '../src/supabase-ca';
 
 /**
  * Connects as hisaab_dashboard, the way the dashboard will, and tries what it should
- * and should not be able to do: `pnpm db:check:role:prod`. Writes are attempted in a
- * transaction that always rolls back. Prints pass or fail and error codes, never rows.
+ * and should not be able to do: `pnpm db:check:role:prod`. Forbidden writes run in a
+ * transaction that always rolls back. One real write: a row added to and removed from
+ * better_auth.verification. Prints pass or fail and error codes, never rows.
  */
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
@@ -56,6 +57,17 @@ const denied = async (name: string, statement: string) => {
 try {
   const accounts = await readAccounts(db);
   report('reads accounts', true, `${accounts.length} rows`);
+  // Zero rows looks the same as a missing policy, so check the policies directly.
+  const { rows } = await db.execute(
+    sql`SELECT count(*)::int AS policies FROM pg_policies
+        WHERE policyname = 'dashboard_read'
+          AND tablename IN ('Account', 'Entry', 'Transaction')`,
+  );
+  report(
+    'can see rows through its read policies',
+    rows[0]?.policies === 3,
+    `${String(rows[0]?.policies)} of 3`,
+  );
   const txs = await readTransactions(db, {
     start: new Date(0),
     end: new Date('2100-01-01T00:00:00Z'),

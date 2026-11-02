@@ -17,12 +17,17 @@ let db: Db | undefined;
 export function getDb(): Db {
   if (!db) {
     const url = requiredEnv('DATABASE_URL');
-    db = createDb(url, {
+    const created = createDb(url, {
       max: 1,
       idleTimeoutMillis: IDLE_TIMEOUT_MS,
       // Local Docker has no TLS. Anything else must verify Supabase's certificate.
       ...(!isLocalDatabaseUrl(url) && { ca: SUPABASE_ROOT_CA }),
-    }).db;
+    });
+    // Without a listener, a dropped idle connection crashes the process.
+    created.pool.on('error', () =>
+      console.error('dashboard: idle connection failed'),
+    );
+    db = created.db;
   }
   return db;
 }

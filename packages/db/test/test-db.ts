@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 
 import pg from 'pg';
 
+import { isLocalDatabaseUrl } from '../src/database-url';
+
 export const dashboardRoleScript = () =>
   readFile(
     fileURLToPath(new URL('../scripts/dashboard-role.sql', import.meta.url)),
@@ -38,6 +40,10 @@ export function assertTestDatabaseUrl(raw: string | undefined): URL {
     throw new Error(
       'TEST_DATABASE_URL must point at a database ending in _test',
     );
+  }
+  // Test setup changes a server-wide role's password, so it must never reach a hosted server.
+  if (!isLocalDatabaseUrl(raw)) {
+    throw new Error('TEST_DATABASE_URL must point at a local database');
   }
   return url;
 }

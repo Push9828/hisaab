@@ -17,8 +17,13 @@ export const dynamic = 'force-dynamic';
 
 const TOP_CATEGORIES = 5;
 
-function headline(income: bigint, out: bigint, net: bigint): string {
-  if (income === 0n && out === 0n) return 'Nothing logged yet this month.';
+function headline(
+  income: bigint,
+  out: bigint,
+  net: bigint,
+  month: string,
+): string {
+  if (income === 0n && out === 0n) return `No income or spending in ${month}.`;
   if (net >= 0n)
     return `You kept ${inr(net)} of the ${inr(income)} that came in.`;
   return `You spent ${inr(-net)} more than came in.`;
@@ -78,7 +83,7 @@ export default async function Overview(props: PageProps) {
                 {signedInr(flow.net)}
               </p>
               <p className="mt-3 text-sm leading-relaxed text-[#d5e0ff]">
-                {headline(flow.in, flow.out, flow.net)}
+                {headline(flow.in, flow.out, flow.net, monthLabel(month))}
               </p>
               {flow.adjustments !== 0n && (
                 <p className="mt-3 text-xs text-[#d5e0ff]">
@@ -91,8 +96,13 @@ export default async function Overview(props: PageProps) {
             </div>
           </section>
 
-          <Panel title="Savings rate" subtitle="This month">
+          <Panel title="Savings rate" subtitle={monthLabel(month)}>
             <SavingsGauge rate={data.savingsRate} />
+            {data.spend.some((row) => row.category === 'Home loan EMI') && (
+              <Note>
+                Counts an EMI in full, so real saving is a little higher.
+              </Note>
+            )}
           </Panel>
 
           <Panel title="People" subtitle="As of today">

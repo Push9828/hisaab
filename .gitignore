@@ -5,6 +5,7 @@ node_modules
 dist
 .aws-sam
 .next
+.vercel
 next-env.d.ts
 apps/dashboard/AGENTS.md
 coverage

@@ -94,8 +94,21 @@ describe('loadOrNull', () => {
     logged.mockRestore();
   });
 
-  it('adds the savings rate for the selected month', async () => {
-    const result = await loadOrNull(OCTOBER);
-    expect(result?.savingsRate).toBeNull();
+  it('adds the savings rate for the selected month only', async () => {
+    const income = (occurredAt: string, amount: bigint): ReportTx => ({
+      ...spend(occurredAt, 0n),
+      type: 'INCOME',
+      entries: [{ accountId: 'a', amount }],
+    });
+    mocks.readTransactions.mockResolvedValue([
+      income('2026-10-01T00:00:00Z', 1000n),
+      spend('2026-10-10T00:00:00Z', 500n),
+      income('2026-09-01T00:00:00Z', 9000n),
+    ]);
+    expect((await loadOrNull(OCTOBER))?.savingsRate).toBe(500);
+  });
+
+  it('has no savings rate without income', async () => {
+    expect((await loadOrNull(OCTOBER))?.savingsRate).toBeNull();
   });
 });

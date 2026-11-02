@@ -128,7 +128,11 @@ describe('Better Auth logging', () => {
   it('prints fixed text: its messages can hold query parameters', async () => {
     const { auth } = await setup();
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
-    auth.options.logger.log('error');
+    const log = auth.options.logger.log as (
+      level: string,
+      ...args: string[]
+    ) => void;
+    log('error', 'params: fake-session-token');
     expect(logged.mock.calls).toEqual([['better-auth: error']]);
     logged.mockRestore();
   });

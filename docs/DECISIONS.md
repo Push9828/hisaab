@@ -396,8 +396,9 @@ Rejected: a catch-all `[...all]` route, which would expose every endpoint for no
 
 **Sign-out ends every session, and a session lasts a fixed 7 days with no refresh.** Why: with one user, a lost laptop
 is the main reason to sign out. Refreshing would write during page reads, and a page render cannot set the new cookie
-anyway. Google's OAuth tokens are never used, but Better Auth stores them, so they are encrypted with
-`encryptOAuthTokens`.
+anyway. Google's OAuth tokens are never used, but Better Auth stores them, so the access token is encrypted with
+`encryptOAuthTokens`. That option does not cover the id token, which holds the owner's email and name, so a hook stops it
+being stored at all. Sign-in state lives in an encrypted cookie, so an anonymous click on sign-in writes no database row.
 
 **Dashboard errors are caught where they happen and logged as fixed text; Better Auth's logger prints only the level.**
 Why: with the database down, a failed query's message holds its parameters, and Better Auth's default logger printed the
@@ -440,4 +441,10 @@ though they hold table grants. Nothing in the repo recorded that, so migration 0
 way (it is a no-op on production). The side effect: a non-owner role reads zero rows with no error, so the dashboard would
 have shown 0 everywhere. Rejected: `BYPASSRLS` for the role, which would remove the protection for it entirely. The bot's
 role owns the tables, so it is exempt and unaffected.
+
+**M5 review, 2026-11-02: what was left as it is.** Found by the code and security reviews and accepted for now: Supabase's
+`anon` and `authenticated` roles keep their table grants, because the Data API is off and row-level security is on, so
+removing them is hardening for later. Better Auth prints directly if the user lookup during a session check fails: no
+setting turns that off, and it should hold no token or email. A failed page returns HTTP 200 with a fixed message.
+Totals on the Accounts page net an overpaid card against the others.
 

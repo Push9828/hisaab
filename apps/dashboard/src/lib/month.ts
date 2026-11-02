@@ -9,6 +9,12 @@ export function selectedMonth(
   return parsed ?? istMonthOf(now);
 }
 
+/** The current IST month or later: there is nothing to step forward to. */
+export function isLatestMonth({ year, month }: Month, now: Date): boolean {
+  const current = istMonthOf(now);
+  return year * 12 + month >= current.year * 12 + current.month;
+}
+
 export function shiftMonth({ year, month }: Month, by: number): Month {
   const index = year * 12 + (month - 1) + by;
   return { year: Math.floor(index / 12), month: (index % 12) + 1 };

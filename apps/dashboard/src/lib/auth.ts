@@ -20,6 +20,9 @@ type AuthEnv = {
   googleClientSecret: string;
 };
 
+const withoutIdToken = <T extends object>(account: T) =>
+  ({ ...account, idToken: null }) as T;
+
 export function createAuth(
   database: BetterAuthOptions['database'],
   env: AuthEnv,
@@ -41,17 +44,38 @@ export function createAuth(
         prompt: 'select_account',
       },
     },
-    // Sign-in is the only thing Google is used for, but it still returns tokens.
-    account: { encryptOAuthTokens: true },
+    account: {
+      // Sign-in is the only thing Google is used for, but it still returns tokens.
+      encryptOAuthTokens: true,
+      // In an encrypted cookie, so an anonymous sign-in click writes no database row.
+      storeStateStrategy: 'cookie',
+      // One provider and one person: a different Google account is never the owner.
+      accountLinking: { enabled: false },
+    },
     session: {
       // A fixed lifetime. Refreshing would write during reads, and a page
       // render cannot set the new cookie anyway.
       expiresIn: SESSION_DAYS * 24 * 60 * 60,
       disableSessionRefresh: true,
     },
-    // The fallback for a callback that fails before its state is read.
-    onAPIError: { errorURL: new URL('/sign-in', env.baseURL).toString() },
+    // `errorURL` is the fallback for a callback that fails before its state is read.
+    // `throw` sends unexpected errors to the route's catch. Without it, the router
+    // prints them, and a failed query's message holds its parameters.
+    onAPIError: {
+      errorURL: new URL('/sign-in', env.baseURL).toString(),
+      throw: true,
+    },
     databaseHooks: {
+      // encryptOAuthTokens leaves the id token in clear, and it holds the owner's
+      // email and name. Nothing uses it, so it is not kept.
+      account: {
+        create: {
+          before: async (account) => ({ data: withoutIdToken(account) }),
+        },
+        update: {
+          before: async (account) => ({ data: withoutIdToken(account) }),
+        },
+      },
       user: {
         create: {
           before: async (user) => {

@@ -46,6 +46,23 @@ describe('isAllowed', () => {
     expect(isAllowed(verified(''), list)).toBe(false);
   });
 
+  it('requires the verified flag to be exactly true', () => {
+    const user = { email: 'owner@example.com', emailVerified: 'false' };
+    expect(
+      isAllowed(
+        user as unknown as Parameters<typeof isAllowed>[0],
+        'owner@example.com',
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a non-ASCII email that lowercases to an allowed one', () => {
+    // U+212A KELVIN SIGN lowercases to k.
+    expect(
+      isAllowed(verified('\u212Aate@example.com'), 'kate@example.com'),
+    ).toBe(false);
+  });
+
   it('does not match on part of an address', () => {
     expect(
       isAllowed(verified('owner@example.com.evil.test'), 'owner@example.com'),

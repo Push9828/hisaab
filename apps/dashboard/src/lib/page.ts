@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { loadOrNull } from './data';
-import { monthParam, selectedMonth } from './month';
+import { isLatestMonth, selectedMonth } from './month';
 
 export type PageProps = {
   searchParams: Promise<{ month?: string | string[] }>;
@@ -13,7 +13,7 @@ export async function loadPage({ searchParams }: PageProps) {
   const month = selectedMonth((await searchParams).month, now);
   return {
     month,
-    isCurrent: monthParam(month) === monthParam(selectedMonth(undefined, now)),
+    isCurrent: isLatestMonth(month, now),
     data: await loadOrNull(month),
   };
 }

@@ -9,7 +9,7 @@ import { requiredEnv } from './env';
 
 /**
  * The gate. Every server read calls this first (SPEC section 9): it checks the
- * session and the allowlist each time, so removing an email takes effect at once.
+ * session and the allowlist each time, so removing an email takes effect at the next deploy.
  */
 export async function requireOwner() {
   const session = await getAuth().api.getSession({ headers: await headers() });

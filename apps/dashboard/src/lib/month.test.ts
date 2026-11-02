@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isLatestMonth,
   lastSixMonths,
   monthLabel,
   monthParam,
@@ -72,5 +73,17 @@ describe('withMonth', () => {
     expect(withMonth('/spending', { year: 2026, month: 3 })).toBe(
       '/spending?month=2026-03',
     );
+  });
+});
+
+describe('isLatestMonth', () => {
+  it('is true for the current IST month and any later one', () => {
+    expect(isLatestMonth({ year: 2026, month: 11 }, NOW)).toBe(true);
+    expect(isLatestMonth({ year: 2030, month: 1 }, NOW)).toBe(true);
+  });
+
+  it('is false for an earlier one', () => {
+    expect(isLatestMonth({ year: 2026, month: 10 }, NOW)).toBe(false);
+    expect(isLatestMonth({ year: 2025, month: 12 }, NOW)).toBe(false);
   });
 });
