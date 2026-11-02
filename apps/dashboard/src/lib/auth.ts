@@ -29,6 +29,11 @@ export function createAuth(
     baseURL: env.baseURL,
     secret: env.secret,
     telemetry: { enabled: false },
+    // Fixed text. Its messages can hold query parameters, such as a session token.
+    logger: {
+      level: 'error',
+      log: (level) => console.error(`better-auth: ${level}`),
+    },
     socialProviders: {
       google: {
         clientId: env.googleClientId,

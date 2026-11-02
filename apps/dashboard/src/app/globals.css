@@ -1,0 +1,183 @@
+:root {
+  --surface: #fcfcfb;
+  --ink: #1f2328;
+  --muted: #5d6570;
+  --rule: #e2e4e7;
+  --bar: #2f6f8f;
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font:
+    16px/1.45 system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 4rem;
+}
+
+header,
+nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+}
+
+nav {
+  margin: 1.5rem 0 1rem;
+}
+
+nav span,
+nav a {
+  min-width: 4.5rem;
+}
+
+nav a:last-child,
+nav span {
+  text-align: right;
+}
+
+section {
+  margin-top: 2.25rem;
+}
+
+a {
+  color: var(--bar);
+}
+
+button {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.tiles {
+  margin-top: 0;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin: 0;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+dd {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+table + table {
+  margin-top: 1rem;
+}
+
+caption {
+  padding-bottom: 0.25rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  text-align: left;
+}
+
+th,
+td {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--rule);
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+th:first-child {
+  padding-right: 0.75rem;
+  text-align: left;
+}
+
+td + td,
+th + th {
+  padding-left: 0.75rem;
+}
+
+tfoot th,
+tfoot td {
+  border-bottom: 0;
+  font-weight: 600;
+}
+
+.bars th:first-child {
+  width: 34%;
+}
+
+.bar {
+  width: 40%;
+  line-height: 0;
+}
+
+.bar rect {
+  fill: var(--bar);
+}
+
+@media (max-width: 30rem) {
+  .bar {
+    width: 25%;
+  }
+
+  dd {
+    font-size: 1rem;
+  }
+}

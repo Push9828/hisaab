@@ -1,5 +1,5 @@
 import { memoryAdapter } from 'better-auth/adapters/memory';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createAuth } from './auth';
 
@@ -100,6 +100,16 @@ describe('Google sign-in', () => {
       'openid',
       'profile',
     ]);
+  });
+});
+
+describe('Better Auth logging', () => {
+  it('prints fixed text: its messages can hold query parameters', async () => {
+    const { auth } = await setup();
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    auth.options.logger.log('error');
+    expect(logged.mock.calls).toEqual([['better-auth: error']]);
+    logged.mockRestore();
   });
 });
 

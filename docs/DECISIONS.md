@@ -399,3 +399,13 @@ Rejected: a catch-all `[...all]` route, which would expose every endpoint for no
 is the main reason to sign out. Refreshing would write during page reads, and a page render cannot set the new cookie
 anyway. Google's OAuth tokens are never used, but Better Auth stores them, so they are encrypted with
 `encryptOAuthTokens`.
+
+**Dashboard errors are caught where they happen and logged as fixed text; Better Auth's logger prints only the level.**
+Why: with the database down, a failed query's message holds its parameters, and Better Auth's default logger printed the
+session token (hard rule 8). Next prints uncaught errors the same way, so the page load, sign-in, sign-out and the
+callback each catch theirs. Cost: logs say what failed but not why, so a real failure is diagnosed by reproducing it.
+Rejected: `error.tsx`, the plan's choice, which is a client component and cannot run under the no-script CSP.
+
+**Report bars are SVG rectangles with a percentage `width` attribute.** Why: the CSP blocks inline styles, and an SVG
+attribute is not a style. Rejected: `<meter>`, which is styled differently in each browser. Every bar has its amount
+beside it as text, so there is no hover tooltip to miss.
