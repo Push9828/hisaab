@@ -287,6 +287,44 @@ describe('dashboard-role.sql', () => {
     expect(await readAccounts(role.db)).toHaveLength(1);
   });
 
+  // Supabase's `postgres` admin is not a superuser, and only a role that holds an
+  // attribute may change it. Fake admin role, created and dropped here.
+  it('runs as a non-superuser admin, as on Supabase', async () => {
+    const client = await admin.pool.connect();
+    try {
+      await client.query('DROP ROLE IF EXISTS sim_admin');
+      await client.query('CREATE ROLE sim_admin NOLOGIN CREATEROLE');
+      await client.query(`GRANT "${url.username}" TO sim_admin`);
+      await client.query(
+        'GRANT hisaab_dashboard TO sim_admin WITH ADMIN OPTION',
+      );
+      await client.query('SET ROLE sim_admin');
+      await client.query(await dashboardRoleScript());
+      await client.query('RESET ROLE');
+      expect(await readAccounts(role.db)).toHaveLength(1);
+    } finally {
+      await client.query('ROLLBACK').catch(() => {});
+      await client.query('RESET ROLE');
+      await client.query(`REVOKE "${url.username}" FROM sim_admin`);
+      await client.query('REVOKE hisaab_dashboard FROM sim_admin');
+      await client.query('DROP ROLE sim_admin');
+      client.release();
+    }
+  });
+
+  it('refuses to finish if the role has gained a special attribute', async () => {
+    await admin.db.execute(sql`ALTER ROLE hisaab_dashboard CREATEDB`);
+    try {
+      await expect(applyDashboardRole(admin.pool)).rejects.toThrow(
+        'special attribute',
+      );
+    } finally {
+      await admin.pool.query('ROLLBACK').catch(() => {});
+      await admin.db.execute(sql`ALTER ROLE hisaab_dashboard NOCREATEDB`);
+    }
+    await applyDashboardRole(admin.pool);
+  });
+
   it('holds no password', async () => {
     const script = await dashboardRoleScript();
     const statements = script.replace(/--.*$/gm, '');

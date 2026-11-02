@@ -18,8 +18,21 @@ BEGIN
 END
 $$;
 
-ALTER ROLE hisaab_dashboard
-  LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+ALTER ROLE hisaab_dashboard LOGIN;
+
+-- Checked rather than set: Supabase's admin is not a superuser, and only a role
+-- that holds an attribute may change it. CREATE ROLE leaves all of these off.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT FROM pg_roles
+    WHERE rolname = 'hisaab_dashboard'
+      AND (rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls)
+  ) THEN
+    RAISE EXCEPTION 'hisaab_dashboard has a special attribute. Remove it first.';
+  END IF;
+END
+$$;
 
 -- Start from nothing. Revoking at table level also removes column grants.
 REVOKE ALL ON "Account", "Entry", "Transaction", "ProcessedMessage"

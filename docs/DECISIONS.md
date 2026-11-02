@@ -426,3 +426,12 @@ dashed. The font is downloaded at build time and served by the app, so the brows
 
 **The transaction list waits until after M5.** It needs `description`, which the dashboard role cannot read, so it is
 its own decision. It is a good next feature, since it also helps find mistakes in older entries.
+
+**The repo stays private until M5 is reviewed.** It was public briefly on 2026-11-02; a scan of the history found no
+secrets, project addresses or real ids, but every commit carries the owner's email. Going public later needs that history
+rewritten to GitHub's noreply address, and a fresh scan.
+
+**`dashboard-role.sql` checks the role's attributes instead of setting them.** Why: on Postgres 17 only a role that holds an
+attribute may change it, so `ALTER ROLE ... NOSUPERUSER` fails for an admin who is not a superuser, which is what Supabase's
+`postgres` is expected to be. `CREATE ROLE` leaves them all off, and the script now stops if any has been switched on.
+
