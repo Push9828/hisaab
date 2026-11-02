@@ -448,3 +448,19 @@ removing them is hardening for later. Better Auth prints directly if the user lo
 setting turns that off, and it should hold no token or email. A failed page returns HTTP 200 with a fixed message.
 Totals on the Accounts page net an overpaid card against the others.
 
+## 2026-11-02 (M5 complete)
+
+**M5 is done: the dashboard runs in production.** Verified on the deployed site: the allowlisted account signs in and a
+second account is rejected, a bot message appears on the dashboard, signed-out pages redirect with no data, the headers
+are present, the region is `bom1`, and `pnpm db:check:role:prod` passes through the Session pooler. Reviewed by
+`code-reviewer` and `security-reviewer`; what was fixed and what was left is above.
+
+**Left out of M5 on purpose:** a `ReportStore` interface in core (one implementation), a chart library, tRPC, data API
+routes, client state, a caching layer, a demo mode, middleware as a security boundary, and a widget system. If one of these
+comes up, it needs its own reason.
+
+**Still out of scope, as decisions for later:** the transaction list, and correcting older transactions (both above);
+budgets and forecasting (SPEC section 3); net worth, because loan balances go stale under the EMI limitation; search and CSV
+export; a custom domain; a hosted public demo; Splitwise; recurring rules (M6). Before making the repo public: revoke
+`anon` and `authenticated` grants, rewrite the email out of the commit history, and scan again.
+

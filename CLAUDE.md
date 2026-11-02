@@ -84,7 +84,7 @@ Four is deliberate. Don't add agents without a concrete recurring need.
 ## Blog rule
 
 A post in `docs/blog/` is drafted only after its milestone's tests pass
-(parser post after M1, LLD after M2, HLD after M3, production post after M4).
+(parser post after M1, LLD after M2, HLD after M3, production post after M4, dashboard post after M5).
 Drafts are mine to edit and publish. Use fake data only.
 
 ## Decisions log
