@@ -7,6 +7,7 @@ const contentSecurityPolicy = [
   "script-src 'none'",
   "style-src 'self'",
   "img-src 'self'",
+  "font-src 'self'",
   "base-uri 'none'",
   // Chrome also applies this to redirects, and sign-in redirects to Google.
   "form-action 'self' https://accounts.google.com",

@@ -414,3 +414,15 @@ beside it as text, so there is no hover tooltip to miss.
 the bot wrote locally, and fake rows mixed into it could not be told apart or removed, since nothing is hard-deleted. The
 seed goes through `ingest`, with fixed ids so a second run is a no-op, and refuses a non-local `DATABASE_URL`. Dates are
 fixed rather than relative to today, so screenshots repeat; open `/?month=2026-10` to see them.
+
+**The dashboard has a designed look, with four pages: Overview, Spending, Accounts and People.** This replaces the M5
+plan's "readable tables, no polish": plain tables were not something the owner wanted to open. Dark navy and blue glass,
+dark only, in the style of the references the owner chose, recreated with no code or images taken from them. Tailwind
+runs at build time and leaves a static CSS file; icons and charts are SVG rendered on the server, so the no-script CSP
+stays. Rejected: JavaScript chart libraries and component kits, which would need browser code and send financial data to
+it (SPEC section 9), and shadcn/ui, whose default look we would have restyled entirely. Cost: no animated charts, and
+only the browser's plain tooltips. Chart colours passed the palette check for colour-blind readers, and Out is also
+dashed. The font is downloaded at build time and served by the app, so the browser never calls Google.
+
+**The transaction list waits until after M5.** It needs `description`, which the dashboard role cannot read, so it is
+its own decision. It is a good next feature, since it also helps find mistakes in older entries.

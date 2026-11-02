@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { loadDashboard } from './data';
+import { loadDashboard, loadOrNull } from './data';
 
 import type { ReportTx } from '@hisaab/core';
 
@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   readTransactions: vi.fn(),
 }));
 
+vi.mock('next/navigation', () => ({
+  unstable_rethrow: (e: unknown) => {
+    if (e instanceof Error && e.message === 'redirected') throw e;
+  },
+}));
 vi.mock('./owner', () => ({ requireOwner: mocks.requireOwner }));
 vi.mock('./db', () => ({ getDb: () => 'db' }));
 vi.mock('@hisaab/db', () => ({
@@ -72,5 +77,25 @@ describe('loadDashboard', () => {
       0n,
       0n,
     ]);
+  });
+});
+
+describe('loadOrNull', () => {
+  it('lets the redirect through, so nobody signed out sees a page', async () => {
+    mocks.requireOwner.mockRejectedValue(new Error('redirected'));
+    await expect(loadOrNull(OCTOBER)).rejects.toThrow('redirected');
+  });
+
+  it('turns a failed read into null and logs fixed text only', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.readAccounts.mockRejectedValue(new Error('params: fake-token'));
+    await expect(loadOrNull(OCTOBER)).resolves.toBeNull();
+    expect(logged.mock.calls).toEqual([['dashboard: could not load']]);
+    logged.mockRestore();
+  });
+
+  it('adds the savings rate for the selected month', async () => {
+    const result = await loadOrNull(OCTOBER);
+    expect(result?.savingsRate).toBeNull();
   });
 });

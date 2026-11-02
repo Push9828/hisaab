@@ -68,6 +68,15 @@ export function cashFlow(txs: readonly ReportTx[], range: DateRange): CashFlow {
   return { in: income, out, net: income - out, adjustments };
 }
 
+/**
+ * SPEC section 4. Net over in, in tenths of a percent, rounded towards zero.
+ * Negative when more went out than came in; null with no income.
+ */
+export function savingsRate({ in: income, net }: CashFlow): number | null {
+  if (income === 0n) return null;
+  return Number((net * 1000n) / income);
+}
+
 export interface NamedAmount {
   name: string;
   amount: Paise;

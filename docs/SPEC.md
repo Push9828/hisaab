@@ -75,6 +75,9 @@ exclude voided transactions.
   - A SPLIT counts only your share. `lend` and `got` count nothing: the money is still yours.
   - An EMI counts in full (see section 12), and the dashboard says so.
   - Examples 1-8 in section 5 give in 85,000, out 38,000, net 47,000, corrections +800.
+- **Savings rate**: net / in for the month, from the cash flow above. It is negative when more went out
+  than came in, and blank when there is no income. An EMI counts in full here too, so it understates
+  real saving by the principal repaid.
 - **People**: "owes me" lists RECEIVABLE accounts with a balance above zero. "I owe" lists PAYABLE
   accounts with a balance and RECEIVABLE accounts below zero (an overpaid `got`). Zero balances
   are hidden, and each side has a total.

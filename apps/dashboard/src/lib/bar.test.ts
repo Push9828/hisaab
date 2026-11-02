@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { barPercent } from './bar';
+import { barPercent, barTop } from './bar';
 
 describe('barPercent', () => {
   it('scales against the largest value', () => {
@@ -21,5 +21,13 @@ describe('barPercent', () => {
   it('stays exact above the safe integer range', () => {
     const huge = 10n ** 30n;
     expect(barPercent(huge / 2n, huge)).toBe('50%');
+  });
+});
+
+describe('barTop', () => {
+  it('is where a bar growing up from the baseline starts', () => {
+    expect(barTop(3_200_000n, 3_200_000n)).toBe('0%');
+    expect(barTop(800_000n, 3_200_000n)).toBe('75%');
+    expect(barTop(0n, 100n)).toBe('100%');
   });
 });

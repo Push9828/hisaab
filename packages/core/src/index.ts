@@ -21,6 +21,7 @@ export {
   balancesByKind,
   cashFlow,
   people,
+  savingsRate,
   spendByCategory,
   UNCATEGORISED,
   type CashFlow,

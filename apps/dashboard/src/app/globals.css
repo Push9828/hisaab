@@ -1,183 +1,139 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --color-ink: #f4f7ff;
+  --color-soft: #c0cae0;
+  --color-inset: #161f38;
+  --color-rule: rgb(190 205 240 / 0.16);
+  --color-accent: #6d97ee;
+  --color-in: #4a86e8;
+  --color-out: #c17f1a;
+  --color-good: #4fd8a8;
+  --color-warn: #ffb38a;
+}
+
 :root {
-  --surface: #fcfcfb;
-  --ink: #1f2328;
-  --muted: #5d6570;
-  --rule: #e2e4e7;
-  --bar: #2f6f8f;
-  color-scheme: light;
+  color-scheme: dark;
 }
 
+/* Always dark: the design does not have a light version. A fixed layer, because
+   iOS Safari ignores background-attachment: fixed. */
 body {
-  margin: 0;
-  background: var(--surface);
-  color: var(--ink);
-  font:
-    16px/1.45 system-ui,
-    -apple-system,
-    sans-serif;
+  min-height: 100dvh;
+  background-color: #171f38;
+  color: var(--color-ink);
 }
 
-main {
-  max-width: 44rem;
-  margin: 0 auto;
-  padding: 1.5rem 1rem 4rem;
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    radial-gradient(60rem 40rem at 72% -10%, #33507f 0%, transparent 62%),
+    radial-gradient(44rem 34rem at 108% 62%, #2d4674 0%, transparent 60%),
+    radial-gradient(38rem 30rem at 18% 110%, #293e68 0%, transparent 60%),
+    linear-gradient(160deg, #171f38 0%, #1e2946 100%);
 }
 
-header,
-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+/* Solid enough that text contrast does not depend on what is behind the card. */
+.glass {
+  border: 1px solid var(--color-rule);
+  border-radius: 1.25rem;
+  background: linear-gradient(
+    127deg,
+    rgb(33 43 74 / 0.94) 20%,
+    rgb(39 52 88 / 0.9) 100%
+  );
+  box-shadow: 0 1rem 2.5rem -1.5rem rgb(8 12 28 / 0.55);
+  backdrop-filter: blur(16px);
 }
 
-h1 {
-  margin: 0;
-  font-size: 1.25rem;
+.icon-tile {
+  background: linear-gradient(145deg, #6d97ee, #4a72cf);
+  box-shadow: 0 0.4rem 1rem -0.3rem rgb(80 120 210 / 0.45);
 }
 
-h2 {
-  margin: 0;
-  font-size: 1.125rem;
-}
-
-h3 {
-  margin: 0 0 0.5rem;
-  font-size: 1rem;
-}
-
-nav {
-  margin: 1.5rem 0 1rem;
-}
-
-nav span,
-nav a {
-  min-width: 4.5rem;
-}
-
-nav a:last-child,
-nav span {
-  text-align: right;
-}
-
-section {
-  margin-top: 2.25rem;
-}
-
-a {
-  color: var(--bar);
-}
-
-button {
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.875rem;
-  cursor: pointer;
-}
-
-.hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+.hero {
+  position: relative;
   overflow: hidden;
-  clip-path: inset(50%);
+  border: 1px solid rgb(150 180 255 / 0.3);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(30rem 22rem at 92% 40%, #4d6fc0 0%, transparent 62%),
+    radial-gradient(18rem 14rem at 78% 115%, #65589f 0%, transparent 70%),
+    linear-gradient(120deg, #26355f 0%, #36508f 100%);
 }
 
-.tiles {
-  margin-top: 0;
+/* The hero's one image: a rupee sign, lit from inside. */
+.hero-glyph {
+  position: absolute;
+  top: 50%;
+  right: 1.5rem;
+  translate: 0 -50%;
+  font-size: 15rem;
+  font-weight: 800;
+  line-height: 1;
+  color: transparent;
+  background: linear-gradient(160deg, #eef3ff 5%, #9db8ee 45%, #5272c0 95%);
+  background-clip: text;
+  filter: drop-shadow(0 0 2.4rem rgb(160 185 240 / 0.4));
+  opacity: 0.85;
+  user-select: none;
 }
 
-dl {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  margin: 0;
+.money-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(150 180 255 / 0.3);
+  border-radius: 1.25rem;
+  background:
+    radial-gradient(16rem 12rem at 100% 0%, #5a76bf 0%, transparent 65%),
+    radial-gradient(14rem 12rem at 100% 100%, #65589f 0%, transparent 70%),
+    linear-gradient(120deg, #2a3a68, #3e5a9c);
 }
 
-dt {
-  color: var(--muted);
-  font-size: 0.875rem;
+.nav-active {
+  background: rgb(120 150 255 / 0.14);
 }
 
-dd {
-  margin: 0;
-  font-size: 1.125rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+.chart-column:hover {
+  fill: rgb(150 180 255 / 0.1);
 }
 
-.note {
-  margin: 0.5rem 0 0;
-  color: var(--muted);
-  font-size: 0.875rem;
+.signin-art {
+  background:
+    radial-gradient(24rem 20rem at 30% 25%, #7a68c8 0%, transparent 65%),
+    radial-gradient(30rem 24rem at 75% 75%, #5880d6 0%, transparent 65%),
+    linear-gradient(150deg, #26355f, #171f38);
 }
 
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9375rem;
-}
-
-table + table {
-  margin-top: 1rem;
-}
-
-caption {
-  padding-bottom: 0.25rem;
-  color: var(--muted);
-  font-size: 0.875rem;
-  text-align: left;
-}
-
-th,
-td {
-  padding: 0.35rem 0;
-  border-bottom: 1px solid var(--rule);
-  font-weight: 400;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-th:first-child {
-  padding-right: 0.75rem;
-  text-align: left;
-}
-
-td + td,
-th + th {
-  padding-left: 0.75rem;
-}
-
-tfoot th,
-tfoot td {
-  border-bottom: 0;
-  font-weight: 600;
-}
-
-.bars th:first-child {
-  width: 34%;
-}
-
-.bar {
-  width: 40%;
-  line-height: 0;
-}
-
-.bar rect {
-  fill: var(--bar);
-}
-
-@media (max-width: 30rem) {
-  .bar {
-    width: 25%;
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
 
-  dd {
-    font-size: 1rem;
+  .rise-2 {
+    animation-delay: 70ms;
+  }
+
+  .rise-3 {
+    animation-delay: 140ms;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 0.6rem;
+    }
+  }
+}
+
+@media (max-width: 40rem) {
+  .hero-glyph {
+    right: -0.5rem;
+    font-size: 10rem;
+    opacity: 0.4;
   }
 }

@@ -6,6 +6,7 @@ import {
   monthParam,
   selectedMonth,
   shiftMonth,
+  withMonth,
 } from './month';
 
 // 18:30 UTC on 31 Oct is already 1 Nov in IST.
@@ -63,5 +64,13 @@ describe('labels', () => {
 
   it('names the month', () => {
     expect(monthLabel({ year: 2026, month: 3 })).toBe('March 2026');
+  });
+});
+
+describe('withMonth', () => {
+  it('keeps the month across pages', () => {
+    expect(withMonth('/spending', { year: 2026, month: 3 })).toBe(
+      '/spending?month=2026-03',
+    );
   });
 });

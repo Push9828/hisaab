@@ -9,6 +9,7 @@ import {
   balancesByKind,
   cashFlow,
   people,
+  savingsRate,
   spendByCategory,
 } from './reports';
 import { type AccountInfo } from './types';
@@ -394,5 +395,35 @@ describe('balancesByKind', () => {
       amount: 8_420_000n - 400_000n,
     });
     expect(card?.accounts).toEqual([{ name: 'ICICI-CC', amount: 150_000n }]);
+  });
+});
+
+describe('savingsRate', () => {
+  const flow = (income: bigint, out: bigint) => ({
+    in: income,
+    out,
+    net: income - out,
+    adjustments: 0n,
+  });
+
+  it('is net over in, in tenths of a percent', () => {
+    expect(savingsRate(flow(8_500_000n, 5_520_000n))).toBe(350);
+    expect(savingsRate(flow(100n, 0n))).toBe(1000);
+  });
+
+  it('is exact for a one-in-three split, rounding towards zero', () => {
+    expect(savingsRate(flow(300n, 200n))).toBe(333);
+  });
+
+  it('goes negative when more went out than came in', () => {
+    expect(savingsRate(flow(100n, 150n))).toBe(-500);
+  });
+
+  it('is null with no income, rather than dividing by zero', () => {
+    expect(savingsRate(flow(0n, 500n))).toBeNull();
+  });
+
+  it('ignores reconcile corrections, as net does', () => {
+    expect(savingsRate({ ...flow(200n, 100n), adjustments: 999n })).toBe(500);
   });
 });

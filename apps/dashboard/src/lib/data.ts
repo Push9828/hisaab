@@ -5,10 +5,12 @@ import {
   cashFlow,
   istMonthRange,
   people,
+  savingsRate,
   spendByCategory,
   type Month,
 } from '@hisaab/core';
 import { readAccounts, readTransactions } from '@hisaab/db';
+import { unstable_rethrow } from 'next/navigation';
 
 import { getDb } from './db';
 import { lastSixMonths } from './month';
@@ -29,9 +31,11 @@ export async function loadDashboard(month: Month) {
     end: rangeOf(month).end,
   });
 
+  const flow = cashFlow(txs, rangeOf(month));
   return {
     spend: spendByCategory(txs, rangeOf(month)),
-    cashFlow: cashFlow(txs, rangeOf(month)),
+    cashFlow: flow,
+    savingsRate: savingsRate(flow),
     history: months.map((m) => ({
       month: m,
       cashFlow: cashFlow(txs, rangeOf(m)),
@@ -39,4 +43,18 @@ export async function loadDashboard(month: Month) {
     balances: balancesByKind(accounts),
     people: people(accounts),
   };
+}
+
+export type Dashboard = Awaited<ReturnType<typeof loadDashboard>>;
+
+/** For pages: null means show the failure message. Lets requireOwner's redirect through. */
+export async function loadOrNull(month: Month): Promise<Dashboard | null> {
+  try {
+    return await loadDashboard(month);
+  } catch (e) {
+    unstable_rethrow(e);
+    // Fixed text: an error can hold query details.
+    console.error('dashboard: could not load');
+    return null;
+  }
 }

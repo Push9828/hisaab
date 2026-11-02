@@ -20,6 +20,9 @@ export const lastSixMonths = (month: Month): Month[] =>
 export const monthParam = ({ year, month }: Month): string =>
   `${year}-${String(month).padStart(2, '0')}`;
 
+export const withMonth = (path: string, month: Month): string =>
+  `${path}?month=${monthParam(month)}`;
+
 const LABEL = new Intl.DateTimeFormat('en-IN', {
   month: 'long',
   year: 'numeric',
