@@ -292,8 +292,14 @@ identity `seq`), `schema.ts` is the truth.
 - The dashboard connects as its own database role, which cannot write to the ledger and cannot read `rawText` or `ProcessedMessage`. It reads and writes only `better_auth` for sign-in.
 - Production secrets are set for Vercel's Production environment only, so a preview deployment cannot reach real data.
 - Logs must not contain full message bodies or balances.
-- From M5.2, free-text descriptions go to the chosen LLM provider, and they may hold names and identifiers
-  (`dinner with john`, `card xx1234 fee`). Amounts and accounts are not sent.
+- From M5.2, free-text descriptions go to the chosen LLM provider, and they may hold names and identifiers. Parsed amounts
+  and accounts are not sent.
+- The M5.2 script (`llm:keywords`) drops account aliases, account names, a card's bank name and any token with a digit, so
+  `dinner with john` goes as `dinner with` if `john` is an account, and `card xx1234 fee` as `card fee`. It shows the owner the
+  text and a code, and sends exactly that text only with `--send=<code>`. It cannot catch a person with no account, a
+  relation, a place or a spelled-out amount. It writes no file, and on production it needs the `llm:keywords:prod` script and
+  refuses to run unless its output is a terminal.
+- Keywords live in a public repo, so only national brands and generic words are added, never a local shop or a person.
 - The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
 - The bot token is never given to the Lambda: replies go back in the webhook response, so only the
   `set-webhook` script on the laptop uses it, from the gitignored `.env`. Rotate via BotFather if leaked.
@@ -341,7 +347,8 @@ is enough.
   That leaves a false figure in that month's Invested and a reconcile correction on the bank. Check the amount before
   sending `open`. A proper correction command would be a grammar change, not yet decided.
 - **Correcting older transactions**: `NEEDS_REVIEW` rows cannot be given a category, and `undo` only voids the
-  latest transaction. Deferred until after M5; see DECISIONS.md (2026-11-01).
+  latest transaction. Deferred until after M5; see DECISIONS.md (2026-11-01). So keywords from M5.2 only help future
+  messages: stored rows stay in "Uncategorised".
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
 - Omitted account: DECIDED, reply with a clarifying question, write nothing.
 - Category list: DECIDED, fixed list in section 6. Add keywords as real use shows gaps.

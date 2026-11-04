@@ -1,9 +1,15 @@
-import { and, asc, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNull, lt, ne, sql } from 'drizzle-orm';
 
 import { accounts, entries, transactions } from './schema';
 
 import type { Db } from './drizzle-store';
-import type { AccountInfo, Category, DateRange, ReportTx } from '@hisaab/core';
+import type {
+  AccountInfo,
+  Category,
+  DateRange,
+  DescriptionCount,
+  ReportTx,
+} from '@hisaab/core';
 
 export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
 
@@ -62,6 +68,64 @@ export function readOnly<T>(db: Db, fn: (tx: Tx) => Promise<T>): Promise<T> {
 
 export const readAccounts = (db: Db): Promise<AccountInfo[]> =>
   readOnly(db, accountsWithBalances);
+
+/**
+ * The next three serve the owner's keyword suggestion script. They are not exported
+ * from the package, and the dashboard's role cannot read `description`.
+ */
+export async function readUncategorised(tx: Tx): Promise<DescriptionCount[]> {
+  const count = sql<number>`count(*)::int`;
+  return tx
+    .select({ description: transactions.description, count })
+    .from(transactions)
+    .where(
+      and(
+        isNull(transactions.category),
+        eq(transactions.status, 'NEEDS_REVIEW'),
+        isNull(transactions.voidedAt),
+      ),
+    )
+    .groupBy(transactions.description);
+}
+
+export const readAccountNames = (
+  tx: Tx,
+): Promise<Pick<AccountInfo, 'alias' | 'name' | 'kind'>[]> =>
+  tx
+    .select({
+      alias: accounts.alias,
+      name: accounts.name,
+      kind: accounts.kind,
+    })
+    .from(accounts);
+
+/**
+ * Confirmed spending under another category whose description holds the keyword as
+ * a whole token, so a future message like it would conflict and go to review.
+ * Returns a number only.
+ */
+export async function countConfirmedWithKeyword(
+  tx: Tx,
+  keyword: string,
+  category: Category,
+): Promise<number> {
+  const [row] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(transactions)
+    .where(
+      and(
+        inArray(transactions.type, ['EXPENSE', 'SPLIT']),
+        eq(transactions.status, 'CONFIRMED'),
+        isNull(transactions.voidedAt),
+        ne(transactions.category, category),
+        // A plain string test on tokens, so that the keyword is never read as a
+        // pattern. It matches core's tokenize() except for two rare Unicode letters
+        // that lower to ASCII, which only affects this count.
+        sql`${keyword} = ANY (regexp_split_to_array(lower(${transactions.description}), '[^a-z0-9]+'))`,
+      ),
+    );
+  return row?.count ?? 0;
+}
 
 /**
  * Non-voided transactions with `occurredAt` in the half-open range, in creation

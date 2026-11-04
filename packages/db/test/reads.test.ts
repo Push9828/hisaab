@@ -17,7 +17,14 @@ import {
 } from '../src';
 import { meta, seed, tx } from './store-contract';
 import { assertTestDatabaseUrl } from './test-db';
-import { readOnly } from '../src/reads';
+import {
+  countConfirmedWithKeyword,
+  readAccountNames,
+  readOnly,
+  readUncategorised,
+} from '../src/reads';
+
+import type { Category } from '@hisaab/core';
 
 // All names and numbers are fake. Amounts are paise.
 const { db, pool } = createDb(
@@ -100,6 +107,80 @@ describe('readAccounts', () => {
 
   it('is empty with no accounts', async () => {
     expect(await readAccounts(db)).toEqual([]);
+  });
+});
+
+describe('keyword suggestion reads', () => {
+  const read = <T>(fn: Parameters<typeof readOnly<T>>[1]) => readOnly(db, fn);
+
+  it('counts distinct uncategorised descriptions, leaving out the rest', async () => {
+    await openAccounts();
+    await send(
+      'chai 20 icici',
+      'chai 30 icici',
+      'samosa 40 split john 10 icici',
+      'petrol 4k cc icici',
+      'in 100 salary icici',
+      // A transfer has a null category too, but it is CONFIRMED.
+      'xfer 100 icici bom',
+      'kurta 900 icici',
+      'undo',
+    );
+    const rows = await read(readUncategorised);
+    expect(rows.sort((a, b) => a.count - b.count)).toEqual([
+      { description: 'samosa', count: 1 },
+      { description: 'chai', count: 2 },
+    ]);
+  });
+
+  it('reads the alias, name and kind of every account', async () => {
+    await openAccounts();
+    const names = await read(readAccountNames);
+    expect(names).toHaveLength(5);
+    expect(names).toContainEqual({
+      alias: 'icicicc',
+      name: 'ICICI-CC',
+      kind: 'CREDIT_CARD',
+    });
+  });
+
+  describe('countConfirmedWithKeyword', () => {
+    const count = (keyword: string, category: Category) =>
+      read((t) => countConfirmedWithKeyword(t, keyword, category));
+
+    it('counts whole tokens in another category, as categorize would match them', async () => {
+      await openAccounts();
+      await send(
+        'doctor bill 100 icici',
+        'Doctor BILL 100 icici',
+        'pharmacy-bill 100 icici',
+        'doctor दवाbill 100 icici',
+        'doctor billing 100 icici',
+        // Income is not spending, so a keyword can't send it to review.
+        'in 100 bill icici',
+      );
+      expect(await count('bill', 'Utilities')).toBe(4);
+    });
+
+    it('leaves out the same category, voided rows and uncategorised rows', async () => {
+      await openAccounts();
+      await send(
+        'doctor bill 100 icici',
+        'gym bill 100 icici',
+        'bill 100 icici',
+        'hospital bill 100 icici',
+        'undo',
+      );
+      expect(await count('bill', 'Health')).toBe(0);
+      expect(await count('bill', 'Utilities')).toBe(2);
+    });
+
+    it('takes the keyword as a value, not as SQL', async () => {
+      await openAccounts();
+      await send('doctor bill 100 icici');
+      expect(await count('x\'; DROP TABLE "Entry"; --', 'Utilities')).toBe(0);
+      expect(await readAccounts(db)).toHaveLength(5);
+    });
   });
 });
 

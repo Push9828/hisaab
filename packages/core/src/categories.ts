@@ -18,6 +18,10 @@ export type Category = (typeof CATEGORIES)[number];
 
 const INCOME_CATEGORIES: readonly Category[] = ['Salary', 'Other income'];
 
+export const SPENDING_CATEGORIES: readonly Category[] = CATEGORIES.filter(
+  (c) => !INCOME_CATEGORIES.includes(c),
+);
+
 /** Spending never carries an income category; it goes to review instead. */
 export const spendCategory = (c: Category | null): Category | null =>
   c !== null && INCOME_CATEGORIES.includes(c) ? null : c;
@@ -70,13 +74,20 @@ const KEYWORDS: Partial<Record<Category, string[]>> = {
   Salary: ['salary', 'payroll'],
 };
 
+/** Lowercase words of a-z and 0-9. Devanagari and other non-Latin text is a separator. */
+export const tokenize = (description: string): string[] =>
+  description
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
 /**
  * Deterministic keyword match on whole lowercase tokens. Returns null when
  * nothing matches or keywords from different categories conflict; the caller
  * marks that NEEDS_REVIEW.
  */
 export function categorize(description: string): Category | null {
-  const tokens = description.toLowerCase().split(/[^a-z0-9]+/);
+  const tokens = tokenize(description);
   const hits = new Set<Category>();
   for (const [category, words] of Object.entries(KEYWORDS)) {
     if (words.some((w) => tokens.includes(w))) hits.add(category as Category);

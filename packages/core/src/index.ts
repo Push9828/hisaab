@@ -1,4 +1,4 @@
-export { CATEGORIES, type Category } from './categories';
+export { CATEGORIES, SPENDING_CATEGORIES, type Category } from './categories';
 export {
   istMonthOf,
   istMonthRange,
@@ -8,6 +8,15 @@ export {
 } from './dates';
 export { ingest, type IncomingMessage, type IngestResult } from './ingest';
 export { interpret } from './interpret';
+export {
+  accountWords,
+  parseSuggestion,
+  prepareBatch,
+  rowsCategorised,
+  summarise,
+  type DescriptionCount,
+  type Suggestion,
+} from './keyword-suggestions';
 export { MemoryStore, type MemoryAccount } from './memory-store';
 export {
   balanceOf,
