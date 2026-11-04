@@ -43,7 +43,7 @@ INR only.
 |---|---|---|
 | BANK | Savings/current account | positive = money I have |
 | CREDIT_CARD | Card account | negative = amount I owe the card |
-| RECEIVABLE | A person who owes me (e.g. Rahul) | positive = they owe me |
+| RECEIVABLE | A person who owes me (e.g. John) | positive = they owe me |
 | PAYABLE | A person I owe | negative = I owe them |
 | LOAN | Optional, tracks loan liability | negative = outstanding |
 | INVESTMENT | One mutual fund, or a stock holding | positive = money put in minus money taken out, never market value; negative once more has come out than went in |
@@ -111,11 +111,11 @@ Amounts in rupees for readability. Real values are paise.
 4. **Home loan EMI**: `emi 32k bom`
    EXPENSE. Entry: BOM -32000. spendAmount 32000. Category "Home loan EMI".
    Counted once, because example 3 was a transfer and counts as nothing.
-5. **Lend money**: `lend rahul 10k icici`
-   TRANSFER. ICICI -10000, RAHUL(receivable) +10000. spendAmount 0.
-   Repayment: `got rahul 5k icici` is TRANSFER RAHUL -5000, ICICI +5000.
-6. **Split bill**: `dinner 4000 split rahul 1000 anita 1000 cc icici`
-   SPLIT. ICICI-CC -4000, RAHUL +1000, ANITA +1000. spendAmount 2000 (remainder is my share).
+5. **Lend money**: `lend john 10k icici`
+   TRANSFER. ICICI -10000, JOHN(receivable) +10000. spendAmount 0.
+   Repayment: `got john 5k icici` is TRANSFER JOHN -5000, ICICI +5000.
+6. **Split bill**: `dinner 4000 split john 1000 sam 1000 cc icici`
+   SPLIT. ICICI-CC -4000, JOHN +1000, SAM +1000. spendAmount 2000 (remainder is my share).
 7. **Income**: `in 85k salary icici` is INCOME. ICICI +85000.
 8. **Reconcile**: `bal icici 85000` when the ledger says 84200 creates an
    ADJUSTMENT of +800 and replies with the difference.
@@ -220,7 +220,7 @@ Illustrative and tool-neutral. The real schema, including the CHECK constraints,
 ```prisma
 model Account {
   id             String   @id @default(cuid())
-  alias          String   @unique   // "icici", "icicicc", "bom", "rahul"
+  alias          String   @unique   // "icici", "icicicc", "bom", "john"
   name           String
   kind           AccountKind
   openingBalance BigInt   @default(0)

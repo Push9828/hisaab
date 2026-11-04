@@ -205,7 +205,7 @@ Why: found in the M3 smoke test. Telegram rejects a `sendMessage` with empty tex
 so fake test accounts would otherwise stay in the account list.
 
 **The tunnel is cloudflared with `--protocol http2`.** Why: no signup. Its "critical failures" pre-check can be
-caused by a VPN kill switch (ProtonVPN here) rather than the network. Its TLS ends at Cloudflare, so real
+caused by a VPN kill switch rather than the network. Its TLS ends at Cloudflare, so real
 messages and balance replies are readable by Cloudflare. M4 removes this extra hop; TLS will then end at AWS API Gateway.
 
 **Telegram delivers one update at a time (`max_connections: 1` in `setWebhook`).**
@@ -428,10 +428,6 @@ dashed. The font is downloaded at build time and served by the app, so the brows
 **The transaction list waits until after M5.** It needs `description`, which the dashboard role cannot read, so it is
 its own decision. It is a good next feature, since it also helps find mistakes in older entries.
 
-**The repo stays private until M5 is reviewed.** It was public briefly on 2026-11-02; a scan of the history found no
-secrets, project addresses or real ids, but every commit carries the owner's email. Going public later needs that history
-rewritten to GitHub's noreply address, and a fresh scan.
-
 **`dashboard-role.sql` checks the role's attributes instead of setting them.** Why: on Postgres 17 only a role that holds an
 attribute may change it, so `ALTER ROLE ... NOSUPERUSER` fails for an admin who is not a superuser, which is what Supabase's
 `postgres` is expected to be. `CREATE ROLE` leaves them all off, and the script now stops if any has been switched on.
@@ -443,9 +439,7 @@ way (it is a no-op on production). The side effect: a non-owner role reads zero 
 have shown 0 everywhere. Rejected: `BYPASSRLS` for the role, which would remove the protection for it entirely. The bot's
 role owns the tables, so it is exempt and unaffected.
 
-**M5 review, 2026-11-02: what was left as it is.** Found by the code and security reviews and accepted for now: Supabase's
-`anon` and `authenticated` roles keep their table grants, because the Data API is off and row-level security is on, so
-removing them is hardening for later. Better Auth prints directly if the user lookup during a session check fails: no
+**M5 review, 2026-11-02: what was left as it is.** Found by the code and security reviews and accepted for now: Better Auth prints directly if the user lookup during a session check fails: no
 setting turns that off, and it should hold no token or email. A failed page returns HTTP 200 with a fixed message.
 Totals on the Accounts page net an overpaid card against the others.
 
@@ -462,8 +456,7 @@ comes up, it needs its own reason.
 
 **Still out of scope, as decisions for later:** the transaction list, and correcting older transactions (both above);
 budgets and forecasting (SPEC section 3); net worth, because loan balances go stale under the EMI limitation; search and CSV
-export; a custom domain; a hosted public demo; Splitwise; recurring rules (M6). Before making the repo public: revoke
-`anon` and `authenticated` grants, rewrite the email out of the commit history, and scan again.
+export; a custom domain; a hosted public demo; Splitwise; recurring rules (M6).
 
 ## 2026-11-04 (M5.1 plan)
 
@@ -514,3 +507,13 @@ Invested (SPEC section 12). Why not fixed: a correction command is a grammar cha
 1440px. In Chrome, `+₹12,34,567` broke after the plus at that width, and a plus says nothing on a figure that is plainly money
 put in. Net keeps its plus, so a Net of `+₹10,00,000` or more can still wrap near that width. Below about 1400px the fifth card
 moves to a second row.
+
+## 2026-11-04 (going public)
+
+**The repo is public under the MIT licence, as a portfolio piece.** Why: SPEC section 1 makes the source code the public
+version. Before the switch: `anon` and `authenticated` lost their table grants on production, so row-level security and the
+disabled Data API are no longer the only things keeping those roles out; commit history uses GitHub's noreply address; the
+full history was scanned for secrets. `DECISIONS.md` stays public, because the reasoning is much of what the repo shows.
+
+**Example data is fake people on real bank names.** `icici` and `bom` name real banks and are kept as readable examples; the
+people, amounts and account balances are made up. Hard rule 9 still applies to everything else.
