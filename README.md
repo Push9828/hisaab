@@ -94,10 +94,6 @@ Postgres for what it can and cannot do.
 pnpm typecheck && pnpm lint && pnpm test
 ```
 
-## How it was built
-
-Built with [Claude Code](https://claude.com/claude-code). `CLAUDE.md` holds the project rules, and `.claude/agents/` holds the planning and review agents used along the way.
-
 ## License
 
 [MIT](LICENSE)
