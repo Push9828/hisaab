@@ -14,6 +14,7 @@
     "db:check:prod": "tsx --env-file=.env.production scripts/check-database.ts",
     "db:check:role:prod": "tsx --env-file=../../apps/dashboard/.env.role-check scripts/check-dashboard-role.ts",
     "db:seed": "tsx --env-file=.env scripts/seed-fake.ts",
+    "llm:accuracy": "tsx --env-file=.env scripts/category-accuracy.ts",
     "db:generate": "drizzle-kit generate",
     "db:up": "docker compose -f ../../docker-compose.yml --env-file .env up -d --wait",
     "db:down": "docker compose -f ../../docker-compose.yml --env-file .env down"

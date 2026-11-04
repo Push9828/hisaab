@@ -11,7 +11,8 @@ lowest-friction input. A dashboard turns the log into cash-flow visibility.
 Secondary goal: a portfolio piece with HLD/LLD write-ups. The public version is
 the source code: anyone can run their own single-user copy with their own tokens
 and accounts. There is no hosted public instance. Portfolio screenshots use
-**seeded fake data only**. Real data never leaves the private deployment.
+**seeded fake data only**. Real data stays in the private deployment, with one exception: from M5.2,
+free-text descriptions go to the chosen LLM provider (section 9).
 
 ## 2. Goals (v1)
 
@@ -176,16 +177,18 @@ undo                                               void the latest non-voided tr
 - Anything ambiguous returns a clarifying question and writes **nothing**: unknown command,
   missing or unknown account, missing description, more than one amount, bad amount, bad or
   future date, wrong account kind, same account twice, bad split, duplicate or reserved alias.
-- Unrecognised category (expenses and splits): keyword rules only in M1. No match, keywords from
+- Unrecognised category (expenses and splits): keyword rules only. No match, keywords from
   two categories, or an income category such as "salary advance", stores the transaction with a
   null category and status `NEEDS_REVIEW`. Income is `Salary` on a salary keyword, else `Other income`.
 
 Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI-CC. Reply "undo" to revert.`
 
 **Categories** (fixed): Food, Groceries, Transport, Rent, Utilities, Shopping, Entertainment,
-Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. Keyword rules first; the
-LLM fallback may only choose from this list given the free-text description. It never sees or
-alters amounts, accounts, or type.
+Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. Today no LLM assigns a
+category: it comes from the keyword rules, the `emi` command or the income default, and no LLM runs in the bot or the dashboard.
+A planned fallback (M5.3) covers expenses and splits after the keyword rules. It may only choose from this list, excluding the
+income categories, or answer `unsure`, given the free-text description; `unsure` leaves the entry `NEEDS_REVIEW`. It never
+sees or alters amounts, accounts, or type.
 
 ## 7. Architecture (HLD)
 
@@ -198,7 +201,7 @@ API Gateway -> Lambda: channel adapter
         v
 packages/core: ingest(message, store) -> dedupe (claim key) -> parse -> validate -> ledger write
         |                                                        |
-        |                                                        +--> categorizer (rules, LLM fallback)
+        |                                                        +--> categorizer (keyword rules; LLM fallback planned, M5.3)
         v
 Postgres (Supabase free tier, Mumbai ap-south-1) via Drizzle
         ^
@@ -289,6 +292,8 @@ identity `seq`), `schema.ts` is the truth.
 - The dashboard connects as its own database role, which cannot write to the ledger and cannot read `rawText` or `ProcessedMessage`. It reads and writes only `better_auth` for sign-in.
 - Production secrets are set for Vercel's Production environment only, so a preview deployment cannot reach real data.
 - Logs must not contain full message bodies or balances.
+- From M5.2, free-text descriptions go to the chosen LLM provider, and they may hold names and identifiers
+  (`dinner with john`, `card xx1234 fee`). Amounts and accounts are not sent.
 - The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
 - The bot token is never given to the Lambda: replies go back in the webhook response, so only the
   `set-webhook` script on the laptop uses it, from the gitignored `.env`. Rotate via BotFather if leaked.
@@ -304,6 +309,9 @@ identity `seq`), `schema.ts` is the truth.
 | M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
 | M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | Nov 4 |
+| M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them; no LLM in the bot. Needs the owner's change to hard rule 2 first | later |
+| M5.3 | Category fallback: on a keyword miss the LLM picks a spending category from the fixed list; a failed, invalid or `unsure` answer leaves the entry `NEEDS_REVIEW` | later |
+| M5.4 | Ledger questions: the LLM picks a fixed read-only report and its filters, and existing code calculates the answer. Needs the owner's change to hard rule 2 and a decision on section 3, because filters could name an account or type | later |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
 
@@ -337,5 +345,8 @@ is enough.
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
 - Omitted account: DECIDED, reply with a clarifying question, write nothing.
 - Category list: DECIDED, fixed list in section 6. Add keywords as real use shows gaps.
+- LLM provider: OPEN. Sarvam is tried first, using `category-accuracy.ts` on fake descriptions. Haiku is the alternative.
+  The provider's retention and training terms are part of the choice.
+- Real descriptions and an LLM provider: DECIDED, allowed for Sarvam. See section 9 and DECISIONS.md (2026-11-04).
 - Dashboard auth: DECIDED, Better Auth + Google OAuth with email allowlist.
 - Channel: DECIDED, Telegram (secret-token header instead of `X-Hub-Signature-256`). WhatsApp optional later.
