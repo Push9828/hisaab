@@ -34,7 +34,7 @@ export function StatRow({ children }: { children: ReactNode }) {
   return (
     <section
       aria-label="Summary"
-      className="grid grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] gap-4"
+      className="grid grid-cols-[repeat(auto-fit,minmax(13rem,1fr))] gap-4"
     >
       {children}
     </section>

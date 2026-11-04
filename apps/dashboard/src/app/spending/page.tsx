@@ -189,11 +189,15 @@ export default async function Spending(props: PageProps) {
                   <th scope="col" className={`${headCell} text-right`}>
                     Net
                   </th>
+                  <th scope="col" className={`${headCell} text-right`}>
+                    Invested
+                  </th>
                 </tr>
               </thead>
               <tbody className="tabular-nums">
-                {data.history.map(({ month: m, cashFlow: flow }) => {
-                  const empty = flow.in === 0n && flow.out === 0n;
+                {data.history.map(({ month: m, cashFlow: flow, invested }) => {
+                  const empty =
+                    flow.in === 0n && flow.out === 0n && invested === 0n;
                   return (
                     <tr
                       key={withMonth('', m)}
@@ -218,6 +222,9 @@ export default async function Spending(props: PageProps) {
                       </td>
                       <td className={`${rowCell} text-right font-semibold`}>
                         {empty ? '—' : signedInr(flow.net)}
+                      </td>
+                      <td className={`${rowCell} text-right`}>
+                        {empty ? '—' : inr(invested)}
                       </td>
                     </tr>
                   );

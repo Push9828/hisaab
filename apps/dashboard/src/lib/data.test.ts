@@ -78,6 +78,37 @@ describe('loadDashboard', () => {
       0n,
     ]);
   });
+
+  it('nets investment moves for the selected month and for each history row', async () => {
+    const move = (occurredAt: string, amount: bigint): ReportTx => ({
+      ...spend(occurredAt, 0n),
+      type: 'TRANSFER',
+      category: null,
+      entries: [
+        { accountId: 'bank', amount: -amount },
+        { accountId: 'fund', amount },
+      ],
+    });
+    mocks.readAccounts.mockResolvedValue([
+      { id: 'bank', alias: 'b', name: 'B', kind: 'BANK', balance: 0n },
+      { id: 'fund', alias: 'f', name: 'F', kind: 'INVESTMENT', balance: 0n },
+    ]);
+    mocks.readTransactions.mockResolvedValue([
+      move('2026-10-10T00:00:00Z', 500n),
+      move('2026-09-10T00:00:00Z', 200n),
+    ]);
+    const { invested, cashFlow, history } = await loadDashboard(OCTOBER);
+    expect(invested).toBe(500n);
+    expect(cashFlow.out).toBe(0n);
+    expect(history.map((row) => row.invested)).toEqual([
+      500n,
+      200n,
+      0n,
+      0n,
+      0n,
+      0n,
+    ]);
+  });
 });
 
 describe('loadOrNull', () => {

@@ -1,5 +1,11 @@
 import { type AccountKind } from '@hisaab/core';
-import { CreditCard, Landmark, PiggyBank, type LucideIcon } from 'lucide-react';
+import {
+  CreditCard,
+  Landmark,
+  PiggyBank,
+  TrendingUp,
+  type LucideIcon,
+} from 'lucide-react';
 
 import {
   AmountTable,
@@ -24,6 +30,11 @@ const KINDS: Partial<
     icon: CreditCard,
   },
   LOAN: { title: 'Loans', stat: 'Owed on loans', icon: PiggyBank },
+  INVESTMENT: {
+    title: 'Investments',
+    stat: 'Invested so far',
+    icon: TrendingUp,
+  },
 };
 
 export default async function Accounts(props: PageProps) {
@@ -49,8 +60,8 @@ export default async function Accounts(props: PageProps) {
       <div className="flex flex-col gap-4">
         {data.balances.length === 0 ? (
           <p className="glass p-6 text-soft">
-            No bank, card or loan accounts yet. Create one with the bot, for
-            example &quot;open icici 50k bank&quot;.
+            No bank, card, loan or investment accounts yet. Create one with the
+            bot, for example &quot;open icici 50k bank&quot;.
           </p>
         ) : (
           <StatRow>
@@ -88,6 +99,13 @@ export default async function Accounts(props: PageProps) {
                       <Note>
                         Loan balances do not go down when you pay an EMI, so
                         they may be out of date.
+                      </Note>
+                    )}
+                    {group.kind === 'INVESTMENT' && (
+                      <Note>
+                        Money put in minus money taken out, not what these are
+                        worth today. A sale for more than went in shows as
+                        negative.
                       </Note>
                     )}
                   </Panel>

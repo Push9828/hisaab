@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // tsconfig says "preserve" for Next; tests that render a page need it compiled.
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: {
       // The real entry throws outside a React server build.

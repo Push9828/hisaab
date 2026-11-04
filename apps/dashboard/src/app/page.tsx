@@ -4,6 +4,7 @@ import {
   HandCoins,
   Landmark,
   Scale,
+  TrendingUp,
 } from 'lucide-react';
 
 import { Note, Panel, Progress, StatCard, StatRow } from '../components/cards';
@@ -65,6 +66,11 @@ export default async function Overview(props: PageProps) {
             icon={ArrowUpRight}
           />
           <StatCard label="Net" value={signedInr(flow.net)} icon={Scale} />
+          <StatCard
+            label="Invested"
+            value={inr(data.invested)}
+            icon={TrendingUp}
+          />
           <StatCard
             label="In the bank today"
             value={inr(banks)}
