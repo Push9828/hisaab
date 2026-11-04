@@ -2,6 +2,7 @@ import {
   balancesByKind,
   cashFlow,
   istMonthRange,
+  netInvested,
   people,
   spendByCategory,
 } from '@hisaab/core';
@@ -106,10 +107,38 @@ describe('seedFake', () => {
     expect(
       balancesByKind(accounts).map((group) => [group.kind, group.total]),
     ).toEqual([
-      ['BANK', rupees(163_000 + 73_300)],
+      // The bank sum is after the investment moves: 10k + 10k + 5k + 10k - 3k.
+      ['BANK', rupees(163_000 + 73_300 - 32_000)],
       ['CREDIT_CARD', rupees(4_800)],
       ['LOAN', rupees(2_500_000)],
+      ['INVESTMENT', rupees(52_000)],
     ]);
+  });
+
+  it('nets investment moves by month, with the sums worked out by hand', async () => {
+    await seedFake(db);
+    const accounts = await readAccounts(db);
+    const invested = async (m: number) => {
+      const range = istMonthRange(2026, m);
+      return netInvested(await readTransactions(db, range), accounts, range);
+    };
+    expect(await invested(8)).toBe(rupees(10_000));
+    expect(await invested(9)).toBe(rupees(15_000));
+    // 10k in, a 5k move between funds that nets to 0, 3k out.
+    expect(await invested(10)).toBe(rupees(7_000));
+
+    expect(
+      balancesByKind(accounts).find((group) => group.kind === 'INVESTMENT'),
+    ).toEqual({
+      kind: 'INVESTMENT',
+      accounts: [
+        { name: 'MFALPHA', amount: rupees(25_000) },
+        // Includes the 20k opening balance, which is in no month's figure.
+        { name: 'MFBETA', amount: rupees(25_000) },
+        { name: 'STOCKS', amount: rupees(2_000) },
+      ],
+      total: rupees(52_000),
+    });
   });
 });
 

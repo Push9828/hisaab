@@ -1,4 +1,4 @@
-import { ingest, istMonthRange } from '@hisaab/core';
+import { ingest, istMonthRange, netInvested } from '@hisaab/core';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -84,6 +84,33 @@ describe('hisaab_dashboard can do what the dashboard needs', () => {
     expect(await readTransactions(role.db, OCTOBER)).toMatchObject([
       { category: 'Home loan EMI', spendAmount: 3_200_000n },
     ]);
+  });
+
+  it('reads investment accounts and moves with no new grant', async () => {
+    const store = new DrizzleStore(admin.db);
+    await store.run((txn) =>
+      txn.createAccount({
+        alias: 'fund',
+        name: 'FUND',
+        kind: 'INVESTMENT',
+        openingBalance: 0n,
+      }),
+    );
+    await ingest(
+      { channel: 'test', externalId: 'm2', text: 'xfer 1k bom fund', now: NOW },
+      store,
+    );
+    const accountRows = await readAccounts(role.db);
+    expect(accountRows).toContainEqual(
+      expect.objectContaining({ alias: 'fund', balance: 100_000n }),
+    );
+    expect(
+      netInvested(
+        await readTransactions(role.db, OCTOBER),
+        accountRows,
+        OCTOBER,
+      ),
+    ).toBe(100_000n);
   });
 
   it('reads and writes all four Better Auth tables', async () => {

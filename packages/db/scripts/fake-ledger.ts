@@ -41,6 +41,16 @@ export const FAKE_MESSAGES = [
   // No keyword matches, so this shows the Uncategorised row.
   'on 25 oct 2026 misc stuff 700 bom',
   'bal icici 163000',
+  // Appended, because each message's id is its index: moving one would replay it.
+  'open mfalpha 0 investment',
+  'open mfbeta 20k investment',
+  'open stocks 0 investment',
+  'on 4 aug 2026 xfer 10k icici mfalpha',
+  'on 4 sep 2026 xfer 10k icici mfalpha',
+  'on 4 sep 2026 xfer 5k icici stocks',
+  'on 4 oct 2026 xfer 10k icici mfalpha',
+  'on 11 oct 2026 xfer 5k mfalpha mfbeta',
+  'on 20 oct 2026 xfer 3k stocks icici',
 ];
 
 /** The same database server, under a database that holds nothing else. Refuses anything not local. */
