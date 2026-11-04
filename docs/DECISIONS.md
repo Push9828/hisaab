@@ -407,8 +407,9 @@ callback each catch theirs. Cost: logs say what failed but not why, so a real fa
 Rejected: `error.tsx`, the plan's choice, which is a client component and cannot run under the no-script CSP.
 
 **Report bars are SVG rectangles with a percentage `width` attribute.** Why: the CSP blocks inline styles, and an SVG
-attribute is not a style. Rejected: `<meter>`, which is styled differently in each browser. Every bar has its amount
-beside it as text, so there is no hover tooltip to miss.
+attribute is not a style. Rejected: `<meter>`, which is styled differently in each browser. Category bars have their
+amount beside them as text. The month bars (`OutBars`) do not: theirs is a plain tooltip and screen-reader text, and the
+same amounts are in the "Last six months" table on that page. (Corrected 2026-11-04: this used to say every bar had one.)
 
 **Fake data goes in its own local database, `hisaab_demo`, never the dev database.** Why: the dev database can hold what
 the bot wrote locally, and fake rows mixed into it could not be told apart or removed, since nothing is hard-deleted. The

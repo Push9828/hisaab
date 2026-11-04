@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 
-// Pages are server-rendered HTML with no client code, so the browser runs no
-// script at all. Injected markup cannot execute, and nothing can send data out.
+// Pages are server-rendered HTML with none of our components on the client, so the browser runs no
+// script at all, and injected markup cannot execute. This does not stop every way
+// out: a link can go anywhere, and a form can post to the addresses in form-action.
 const contentSecurityPolicy = [
   "default-src 'none'",
   "script-src 'none'",

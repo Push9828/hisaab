@@ -1,3 +1,5 @@
+import { inspect } from 'node:util';
+
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,9 +73,11 @@ beforeEach(() => {
     name: 'Fake Owner',
   };
   logged = [];
-  vi.spyOn(console, 'error').mockImplementation((...args) => {
-    logged.push(args);
-  });
+  for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+    vi.spyOn(console, method).mockImplementation((...args) => {
+      logged.push(args);
+    });
+  }
   vi.stubGlobal('fetch', async () =>
     Response.json({
       access_token: 'fake-access-token',
@@ -160,6 +164,9 @@ describe('a database failure during sign-in', () => {
   it('reaches the route catch, and prints no query parameters', async () => {
     const { auth } = setup('session');
     await expect(signIn(auth)).rejects.toThrow();
-    expect(JSON.stringify(logged)).not.toContain('fake-session-token');
+    // Not JSON.stringify: it turns an Error into {}, hiding the message.
+    expect(inspect(logged, { depth: null })).not.toContain(
+      'fake-session-token',
+    );
   });
 });
