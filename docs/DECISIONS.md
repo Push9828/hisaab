@@ -464,3 +464,52 @@ budgets and forecasting (SPEC section 3); net worth, because loan balances go st
 export; a custom domain; a hosted public demo; Splitwise; recurring rules (M6). Before making the repo public: revoke
 `anon` and `authenticated` grants, rewrite the email out of the commit history, and scan again.
 
+## 2026-11-04 (M5.1 plan)
+
+**Investments are a new account kind, `INVESTMENT`, not a spending category.** Why: buying a fund moves money between
+my own accounts, so it is a TRANSFER with `spendAmount = 0`. As a category it would count in out and lower net and the
+savings rate, and money invested would look like money spent. Hard rule 3 then covers it with no new ledger rule.
+
+**One account per mutual fund, plus one `stocks` account for all shares.** Why: a separate account per stock would add
+messages without adding anything a cost-only balance can show.
+Real fund names stay out of the repo (hard rule 9); aliases are set by the owner with `open` in production.
+
+**`xfer` only, no `invest` command for now.** Why: `xfer` already does the job, and a second word for the same
+transaction adds grammar with no new behaviour. Revisit if real use shows `xfer` is awkward.
+
+**An investment balance is money put in minus money taken out, never market value.** Why: market value needs a price
+feed or manual updates, which is a different product (SPEC section 3). A sale for more than went in turns the balance negative, with
+no warning, as an overpaid `got` does.
+
+**`bal <investment> <amount>` is refused at any amount, including 0.** Why: the number anyone would state comes from a
+statement, which is market value. Accepting it would write an ADJUSTMENT that turns a cost figure into a mix of cost and
+value, silently. Rejected: refusing only when the amount differs, which makes the reply depend on the balance.
+
+**Invested is net, over non-voided TRANSFER entries on INVESTMENT accounts, and sits outside in, out, net and savings
+rate.** Why: fund-to-fund moves must net to 0, and a sale should reduce it. The dashboard card is labelled "Invested", not
+"Invested this month", matching "Money in", "Money out" and "Net", which also follow the selected month with no month in
+their labels.
+
+**Investment accounts get their own row, M5.1, separate from M6.** Why: recurring rules are unrelated work. No blog post
+is planned for it.
+
+**Do not roll the adapter back past M5.1 once an investment account exists.** Why: older code negates an unknown kind in
+`signedBalance` and has no `bal` refusal, so `bal <fund> <amount>` on an old Lambda would write an inverted ADJUSTMENT. The
+enum value also cannot be dropped with a simple statement. Deploy order: `db:migrate:prod`, then `deploy:aws`, then
+`git push`, and only then the `open` messages. No `db:role:prod` is needed: the migration changes no grants.
+
+
+## 2026-11-04 (M5.1 built)
+
+**M5.1 is built and reviewed by `code-reviewer` and `security-reviewer`; it is not deployed yet.** All tests pass locally,
+including against Postgres. The pages were checked in Chrome as rendered HTML with the built CSS and fake data, not through a
+signed-in session. Nothing has been run against production.
+
+**A wrong opening balance on an investment account is documented, not fixed.** Found in review: `open` is not undoable and
+`bal` is refused, so the only repair is an `xfer` plus a `bal` on the bank, which leaves a false figure in that month's
+Invested (SPEC section 12). Why not fixed: a correction command is a grammar change, and it may never be needed.
+
+**Stat cards have a 13rem minimum, down from 14rem, and Invested has no plus sign.** Why: five cards then fit on one row at
+1440px. In Chrome, `+₹12,34,567` broke after the plus at that width, and a plus says nothing on a figure that is plainly money
+put in. Net keeps its plus, so a Net of `+₹10,00,000` or more can still wrap near that width. Below about 1400px the fifth card
+moves to a second row.

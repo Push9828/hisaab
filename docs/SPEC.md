@@ -29,6 +29,7 @@ and accounts. There is no hosted public instance. Portfolio screenshots use
 - Splitwise sync (planned v2, read-only, see section 11).
 - Bank statement import (possible v2).
 - Principal/interest split of loan EMIs (v2, see known limitations).
+- Market value, units, NAV, returns or capital gains for investments.
 - Any LLM involvement in amounts, accounts, or transaction type.
 
 ## 4. Domain model
@@ -45,6 +46,7 @@ INR only.
 | RECEIVABLE | A person who owes me (e.g. Rahul) | positive = they owe me |
 | PAYABLE | A person I owe | negative = I owe them |
 | LOAN | Optional, tracks loan liability | negative = outstanding |
+| INVESTMENT | One mutual fund, or a stock holding | positive = money put in minus money taken out, never market value; negative once more has come out than went in |
 
 Balance = openingBalance + sum(entries) on non-voided transactions.
 
@@ -77,7 +79,10 @@ exclude voided transactions.
   - Examples 1-8 in section 5 give in 85,000, out 38,000, net 47,000, corrections +800.
 - **Savings rate**: net / in for the month, from the cash flow above. It is negative when more went out
   than came in, and blank when there is no income. An EMI counts in full here too, so it understates
-  real saving by the principal repaid.
+  real saving by the principal repaid. Money invested still counts as saved.
+- **Invested**: sum of entries on INVESTMENT accounts, from TRANSFER transactions in the month. Negative
+  when more came out than went in. Moving money between two funds nets to 0. An opening balance is not a
+  transaction, so it is not counted. Invested is its own figure and takes no part in in, out, net or savings rate.
 - **People**: by the sign of the balance. "Owes me" lists RECEIVABLE or PAYABLE accounts above zero, and
   "I owe" lists those below zero (a PAYABLE, or an overpaid `got`). Zero balances
   are hidden, and each side has a total.
@@ -89,6 +94,7 @@ exclude voided transactions.
 4. Voided transactions are excluded from balances and reports. Nothing is ever hard-deleted.
 5. A given (channel, externalMessageId) is processed at most once. This holds for every message that writes anything (transactions, `open`, `undo`), not only those that create a Transaction.
 6. Account balance is always derivable from opening balance + entries. No stored running balance.
+7. Moving money to, from or between INVESTMENT accounts never changes out, net or savings rate.
 
 ## 5. Worked examples (acceptance tests)
 
@@ -113,6 +119,15 @@ Amounts in rupees for readability. Real values are paise.
 7. **Income**: `in 85k salary icici` is INCOME. ICICI +85000.
 8. **Reconcile**: `bal icici 85000` when the ledger says 84200 creates an
    ADJUSTMENT of +800 and replies with the difference.
+9. **Buy an investment**: `xfer 10k icici mfalpha`
+   TRANSFER. ICICI -10000, MFALPHA +10000. spendAmount 0. Invested +10000. Out and net unchanged.
+10. **Sale for more than went in**: with MFALPHA at 10000, `xfer 12k mfalpha icici`
+    TRANSFER. MFALPHA -12000, ICICI +12000. spendAmount 0. MFALPHA is now -2000, with no warning.
+    Invested -12000. In, out and net unchanged: the 2000 gain is not income.
+11. **Fund to fund**: `xfer 5k mfalpha mfbeta`
+    TRANSFER. MFALPHA -5000, MFBETA +5000. spendAmount 0. Invested +0.
+12. **Investment reconcile refused**: `bal mfalpha 15000` (or any amount, including 0) replies with a
+    clarifying question and writes nothing. `bal mfalpha` alone still shows the balance.
 
 ## 6. Message grammar (final, M1)
 
@@ -127,7 +142,7 @@ Deterministic, tokenized, case-insensitive. No LLM. Implemented in `packages/cor
 [<date>] lend <person> <amount> <account>          transfer to receivable
 [<date>] got <person> <amount> <account>           repayment from receivable
 [<date>] <desc...> <amount> split <p1> <a1> [<p2> <a2> ...] <account>
-open <alias> <amount> <kind>                       kinds: bank cc receivable payable loan
+open <alias> <amount> <kind>                       kinds: bank cc receivable payable loan investment
 bal [<account>] [<amount>]                         show balance, or reconcile to stated amount
 accounts                                           list accounts and balances
 undo                                               void the latest non-voided transaction (adjustments included; `open` is not undoable)
@@ -148,9 +163,12 @@ undo                                               void the latest non-voided tr
 - Credit cards, payables and loans: a stated amount (`open`, `bal`) means the amount owed and
   is stored as a negative balance. A stated bank balance cannot be negative, but spending and
   transfers can still overdraw a bank account.
-- `xfer` works between BANK, CREDIT_CARD and LOAN accounts (so `xfer` to a card also works as a
+- Investments: the amount in `open` is money already put in, stored positive. `bal <investment> <amount>`
+  is always refused, because a statement states market value and the balance is not that. `xfer` is the only
+  way money moves in or out: expense, `in`, `emi`, `pay`, `lend`, `got` and `split` refuse an investment account.
+- `xfer` works between BANK, CREDIT_CARD, LOAN and INVESTMENT accounts (so `xfer` to a card also works as a
   bill payment). Use `lend` and `got` for people. PAYABLE accounts exist only via `open` for now.
-- Account kind words for `open`: `bank`, `cc` (or `credit_card`), `receivable`, `payable`, `loan`.
+- Account kind words for `open`: `bank`, `cc` (or `credit_card`), `receivable`, `payable`, `loan`, `investment`.
 - `got` may exceed what the person owes; the receivable then goes negative. No warning in v1.
 - `lend`, `got` and `split` people must exist as RECEIVABLE accounts (`open sam 0 receivable`).
   Split: own share may be zero; each person once, non-zero; shares may not exceed the total.
@@ -251,7 +269,7 @@ model ProcessedMessage {
   @@id([channel, externalId])
 }
 
-enum AccountKind { BANK CREDIT_CARD RECEIVABLE PAYABLE LOAN }
+enum AccountKind { BANK CREDIT_CARD RECEIVABLE PAYABLE LOAN INVESTMENT }
 enum TxType { INCOME EXPENSE TRANSFER SPLIT ADJUSTMENT }
 enum TxStatus { CONFIRMED NEEDS_REVIEW }
 ```
@@ -285,6 +303,7 @@ identity `seq`), `schema.ts` is the truth.
 | M3 | Channel adapter running locally behind a tunnel, end-to-end from the real chat app | Nov 2 |
 | M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
+| M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | next |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
 
@@ -304,6 +323,15 @@ is enough.
 - **EMI as an expense** overstates spending relative to economics and leaves loan
   balance and net worth stale. Fix in v2 by splitting principal (transfer to LOAN
   account) from interest (expense).
+- **Investment balances are not what the holding is worth.** They are money in minus money out, so a balance
+  says nothing about gain or loss, a sale for more than went in turns it negative, and gains and dividends never appear
+  as income. Dividends paid to a bank account can be logged with `in`, which does count as income.
+  `bal` cannot correct these accounts: an older mistake is corrected with an opposite `xfer`, which also changes
+  Invested in the month it is logged, so the month of the mistake stays wrong.
+- **A wrong opening balance on an investment account is awkward to fix.** `open` is not undoable and `bal` is refused.
+  To correct it, `xfer` the difference against a bank account, then `bal <bank> <real balance>` to put the bank back.
+  That leaves a false figure in that month's Invested and a reconcile correction on the bank. Check the amount before
+  sending `open`. A proper correction command would be a grammar change, not yet decided.
 - **Correcting older transactions**: `NEEDS_REVIEW` rows cannot be given a category, and `undo` only voids the
   latest transaction. Deferred until after M5; see DECISIONS.md (2026-11-01).
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
