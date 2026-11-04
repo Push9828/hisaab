@@ -309,7 +309,7 @@ identity `seq`), `schema.ts` is the truth.
 | M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
 | M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | Nov 4 |
-| M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them; no LLM in the bot. Needs the owner's change to hard rule 2 first | later |
+| M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them before adding any; no LLM in the bot | later |
 | M5.3 | Category fallback: on a keyword miss the LLM picks a spending category from the fixed list; a failed, invalid or `unsure` answer leaves the entry `NEEDS_REVIEW` | later |
 | M5.4 | Ledger questions: the LLM picks a fixed read-only report and its filters, and existing code calculates the answer. Needs the owner's change to hard rule 2 and a decision on section 3, because filters could name an account or type | later |
 | M6 | Recurring rules via EventBridge | later |
