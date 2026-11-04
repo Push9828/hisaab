@@ -116,14 +116,19 @@ function execute(command: Command, at: Date, ctx: Context): Result {
       if (isClarify(from)) return from;
       const to = find(ctx, command.to);
       if (isClarify(to)) return to;
-      const banky: AccountKind[] = ['BANK', 'CREDIT_CARD', 'LOAN'];
+      const banky: AccountKind[] = [
+        'BANK',
+        'CREDIT_CARD',
+        'LOAN',
+        'INVESTMENT',
+      ];
       if (
         !banky.includes(from.account.kind) ||
         !banky.includes(to.account.kind)
       ) {
         return clarify(
           'KIND_MISMATCH',
-          'xfer works between bank accounts, cards and loans. Use "lend" or "got" for people.',
+          'xfer works between bank accounts, cards, loans and investments. Use "lend" or "got" for people.',
         );
       }
       return buildTransfer(
@@ -204,6 +209,12 @@ function execute(command: Command, at: Date, ctx: Context): Result {
       if (isClarify(found)) return found;
       if (command.stated === undefined) {
         return { kind: 'balances', accountIds: [found.account.id] };
+      }
+      if (found.account.kind === 'INVESTMENT') {
+        return clarify(
+          'KIND_MISMATCH',
+          `${found.account.name} shows money put in minus money taken out, not what it is worth, so it cannot be reconciled. Use "xfer" to correct a mistake.`,
+        );
       }
       const target = signedBalance(found.account.kind, command.stated);
       const difference = target - found.account.balance;

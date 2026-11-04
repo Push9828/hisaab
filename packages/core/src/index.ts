@@ -20,6 +20,7 @@ export { reply } from './reply';
 export {
   balancesByKind,
   cashFlow,
+  netInvested,
   people,
   savingsRate,
   spendByCategory,

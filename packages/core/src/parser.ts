@@ -59,6 +59,7 @@ const KIND_WORDS: Record<string, AccountKind> = {
   receivable: 'RECEIVABLE',
   payable: 'PAYABLE',
   loan: 'LOAN',
+  investment: 'INVESTMENT',
 };
 
 // Contains a digit and no letters other than a trailing k/l suffix.

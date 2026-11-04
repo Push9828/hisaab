@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ACCOUNTS, NOW, ctx, id } from './fixtures';
 import { interpret } from './interpret';
-import { type ProposedTx } from './types';
+import { type AccountInfo, type ProposedTx } from './types';
 
 // SPEC section 5 worked examples. Amounts are paise.
 function propose(text: string, accounts = ACCOUNTS): ProposedTx {
@@ -117,6 +117,100 @@ describe('SPEC section 5 examples', () => {
     expect(tx.entries).toEqual([
       { accountId: id('icicicc'), amount: -50_000n },
     ]);
+  });
+});
+
+describe('SPEC section 5 examples: investments', () => {
+  const fund = (alias: string, balance: bigint): AccountInfo => ({
+    id: id(alias),
+    alias,
+    name: alias.toUpperCase(),
+    kind: 'INVESTMENT',
+    balance,
+  });
+  const WITH_FUNDS = [
+    ...ACCOUNTS,
+    fund('mfalpha', 1_000_000n),
+    fund('mfbeta', 0n),
+  ];
+
+  it('9. buying is a transfer, not spend', () => {
+    const tx = propose('xfer 10k icici mfalpha', WITH_FUNDS);
+    expect(tx.type).toBe('TRANSFER');
+    expect(tx.entries).toEqual([
+      { accountId: id('icici'), amount: -1_000_000n },
+      { accountId: id('mfalpha'), amount: 1_000_000n },
+    ]);
+    expect(tx.spendAmount).toBe(0n);
+  });
+
+  it('10. a sale above what went in is allowed, and is not income', () => {
+    const tx = propose('xfer 12k mfalpha icici', WITH_FUNDS);
+    expect(tx.type).toBe('TRANSFER');
+    expect(tx.entries).toEqual([
+      { accountId: id('mfalpha'), amount: -1_200_000n },
+      { accountId: id('icici'), amount: 1_200_000n },
+    ]);
+    expect(tx.spendAmount).toBe(0n);
+  });
+
+  it('11. fund to fund', () => {
+    const tx = propose('xfer 5k mfalpha mfbeta', WITH_FUNDS);
+    expect(tx.type).toBe('TRANSFER');
+    expect(tx.entries).toEqual([
+      { accountId: id('mfalpha'), amount: -500_000n },
+      { accountId: id('mfbeta'), amount: 500_000n },
+    ]);
+    expect(tx.spendAmount).toBe(0n);
+  });
+
+  it.each(['bal mfalpha 15000', 'bal mfalpha 10000', 'bal mfalpha 0'])(
+    '12. %s is refused, even when it matches',
+    (text) => {
+      expect(interpret(text, ctx(WITH_FUNDS))).toMatchObject({
+        kind: 'clarify',
+        reason: 'KIND_MISMATCH',
+      });
+    },
+  );
+
+  it('12b. bal alone still shows the balance', () => {
+    expect(interpret('bal mfalpha', ctx(WITH_FUNDS))).toEqual({
+      kind: 'balances',
+      accountIds: [id('mfalpha')],
+    });
+  });
+
+  it.each([
+    'petrol 4k mfalpha',
+    'in 500 dividend mfalpha',
+    'emi 4k mfalpha',
+    'pay mfalpha 4k from icici',
+    'pay icicicc 4k from mfalpha',
+    'lend rahul 4k mfalpha',
+    'got rahul 4k mfalpha',
+    'dinner 4000 split rahul 1000 mfalpha',
+    'lend mfalpha 4k icici',
+    'dinner 4000 split mfalpha 1000 icici',
+  ])('only xfer moves money: %s is refused', (text) => {
+    expect(interpret(text, ctx(WITH_FUNDS))).toMatchObject({
+      kind: 'clarify',
+      reason: 'KIND_MISMATCH',
+    });
+  });
+
+  it('opens with the money already put in, stored positive', () => {
+    expect(interpret('open mfgamma 50k investment', ctx(WITH_FUNDS))).toEqual({
+      kind: 'open',
+      alias: 'mfgamma',
+      name: 'MFGAMMA',
+      accountKind: 'INVESTMENT',
+      openingBalance: 5_000_000n,
+    });
+  });
+
+  it('allows an alias equal to the kind word, as with other kinds', () => {
+    expect(interpret('open investment 0 investment', ctx()).kind).toBe('open');
   });
 });
 

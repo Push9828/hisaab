@@ -8,6 +8,7 @@ import {
   type ReportTx,
   balancesByKind,
   cashFlow,
+  netInvested,
   people,
   savingsRate,
   spendByCategory,
@@ -295,11 +296,12 @@ describe('people', () => {
     });
   });
 
-  it('ignores banks, cards and loans', () => {
+  it('ignores banks, cards, loans and investments', () => {
     const accounts = [
       account('Bank', 'BANK', 100n),
       account('Card', 'CREDIT_CARD', -100n),
       account('Loan', 'LOAN', -100n),
+      account('Fund', 'INVESTMENT', 100n),
     ];
     expect(people(accounts).owesMe).toEqual([]);
     expect(people(accounts).iOwe).toEqual([]);
@@ -376,6 +378,28 @@ describe('balancesByKind', () => {
     ]);
   });
 
+  it('lists investments last, as put in, with a sale for more than went in negative', () => {
+    const accounts = [
+      account('Sold', 'INVESTMENT', -200n),
+      account('Held', 'INVESTMENT', 500n),
+      account('Bank', 'BANK', 100n),
+      account('Loan', 'LOAN', -900n),
+    ];
+    expect(balancesByKind(accounts).map((group) => group.kind)).toEqual([
+      'BANK',
+      'LOAN',
+      'INVESTMENT',
+    ]);
+    expect(balancesByKind(accounts)[2]).toEqual({
+      kind: 'INVESTMENT',
+      accounts: [
+        { name: 'Held', amount: 500n },
+        { name: 'Sold', amount: -200n },
+      ],
+      total: 300n,
+    });
+  });
+
   it('leaves people to the people panel and omits empty groups', () => {
     const accounts = [
       account('Dev', 'RECEIVABLE', 100n),
@@ -395,6 +419,75 @@ describe('balancesByKind', () => {
       amount: 8_420_000n - 400_000n,
     });
     expect(card?.accounts).toEqual([{ name: 'ICICI-CC', amount: 150_000n }]);
+  });
+});
+
+describe('netInvested', () => {
+  const ACCTS = [
+    account('bank', 'BANK', 0n),
+    account('fund', 'INVESTMENT', 0n),
+    account('other', 'INVESTMENT', 0n),
+  ];
+  const move = (
+    from: string,
+    to: string,
+    amount: bigint,
+    overrides: Partial<ReportTx> = {},
+  ) =>
+    row({
+      type: 'TRANSFER',
+      category: null,
+      spendAmount: 0n,
+      entries: [
+        { accountId: from, amount: -amount },
+        { accountId: to, amount },
+      ],
+      ...overrides,
+    });
+
+  it('adds what went in and takes off what came out', () => {
+    const txs = [move('bank', 'fund', 1_000n), move('fund', 'bank', 300n)];
+    expect(netInvested(txs, ACCTS, OCTOBER)).toBe(700n);
+  });
+
+  it('SPEC section 5, example 10: goes negative after a sale above what went in', () => {
+    const txs = [move('fund', 'bank', 1_200n)];
+    expect(netInvested(txs, ACCTS, OCTOBER)).toBe(-1_200n);
+  });
+
+  it('SPEC section 5, example 11: fund to fund nets to zero', () => {
+    const txs = [move('fund', 'other', 500n)];
+    expect(netInvested(txs, ACCTS, OCTOBER)).toBe(0n);
+  });
+
+  it('leaves out voided rows and rows outside the month', () => {
+    const txs = [
+      move('bank', 'fund', 1n, { voidedAt: new Date(0) }),
+      move('bank', 'fund', 2n, {
+        occurredAt: new Date(OCTOBER.start.getTime() - 1),
+      }),
+      move('bank', 'fund', 4n, { occurredAt: OCTOBER.start }),
+      move('bank', 'fund', 8n, { occurredAt: OCTOBER.end }),
+    ];
+    expect(netInvested(txs, ACCTS, OCTOBER)).toBe(4n);
+  });
+
+  it('ignores transfers that touch no investment, and non-transfers', () => {
+    const txs = [
+      move('bank', 'card', 100n),
+      row({
+        type: 'ADJUSTMENT',
+        category: null,
+        spendAmount: 0n,
+        entries: [{ accountId: 'fund', amount: 7n }],
+      }),
+    ];
+    expect(netInvested(txs, ACCTS, OCTOBER)).toBe(0n);
+  });
+
+  it('is zero with no investment accounts', () => {
+    const txs = [move('bank', 'fund', 1_000n)];
+    expect(netInvested(txs, [account('bank', 'BANK', 0n)], OCTOBER)).toBe(0n);
   });
 });
 

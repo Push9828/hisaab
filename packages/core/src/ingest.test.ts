@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import { istMonthRange } from './dates';
 import { ACCOUNTS, NOW } from './fixtures';
 import { ingest } from './ingest';
 import { MemoryStore } from './memory-store';
+import { netInvested } from './reports';
 
 // All names and numbers are fake. Fixture balances are used as opening balances.
 function setup() {
@@ -29,6 +31,47 @@ function setup() {
   const count = () => store.snapshot().transactions.length;
   return { store, send, balance, spend, count };
 }
+
+describe('ingest: SPEC section 5 investment examples, persisted', () => {
+  const opened = async () => {
+    const context = setup();
+    await context.send('open mfalpha 0 investment');
+    await context.send('xfer 10k icici mfalpha');
+    return context;
+  };
+
+  it('10. a sale for more than went in goes negative and adds no spend', async () => {
+    const { send, balance, spend } = await opened();
+    await send('xfer 12k mfalpha icici');
+    expect(await balance('mfalpha')).toBe(-200_000n);
+    expect(await balance('icici')).toBe(8_420_000n + 200_000n);
+    expect(spend()).toBe(0n);
+  });
+
+  it('12. a refused reconcile writes nothing and claims nothing', async () => {
+    const { store, send, balance, count } = await opened();
+    const before = count();
+    const out = await send('bal mfalpha 15000', 'refused');
+    expect(out.reply).toContain('cannot be reconciled');
+    expect(await balance('mfalpha')).toBe(1_000_000n);
+    expect(count()).toBe(before);
+    expect(await store.run((db) => db.wasProcessed('test', 'refused'))).toBe(
+      false,
+    );
+  });
+
+  it('undo reverses a move, in the balance and in Invested', async () => {
+    const { store, send, balance } = await opened();
+    await send('undo');
+    expect(await balance('mfalpha')).toBe(0n);
+    expect(await balance('icici')).toBe(8_420_000n);
+    const accounts = await store.run((db) => db.accounts());
+    const txs = store
+      .snapshot()
+      .transactions.map((t) => ({ ...t.proposed, voidedAt: t.voidedAt }));
+    expect(netInvested(txs, accounts, istMonthRange(2026, 10))).toBe(0n);
+  });
+});
 
 describe('ingest: SPEC section 5 examples, persisted', () => {
   it('1. credit card spend hits the card only and counts as spend', async () => {

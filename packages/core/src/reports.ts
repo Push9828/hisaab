@@ -77,6 +77,28 @@ export function savingsRate({ in: income, net }: CashFlow): number | null {
   return Number((net * 1000n) / income);
 }
 
+/**
+ * SPEC section 4. Money into investments minus money out, for the range. Moves
+ * between two funds net to zero. Takes no part in cash flow.
+ */
+export function netInvested(
+  txs: readonly ReportTx[],
+  accounts: readonly AccountInfo[],
+  range: DateRange,
+): Paise {
+  const investments = new Set(
+    accounts.filter((a) => a.kind === 'INVESTMENT').map((a) => a.id),
+  );
+  let total = 0n;
+  for (const tx of txs) {
+    if (!counts(tx, range) || tx.type !== 'TRANSFER') continue;
+    for (const entry of tx.entries) {
+      if (investments.has(entry.accountId)) total += entry.amount;
+    }
+  }
+  return total;
+}
+
 export interface NamedAmount {
   name: string;
   amount: Paise;
@@ -125,7 +147,12 @@ export interface KindBalances {
 }
 
 // People are left to the People panel.
-const BALANCE_KINDS: AccountKind[] = ['BANK', 'CREDIT_CARD', 'LOAN'];
+const BALANCE_KINDS: AccountKind[] = [
+  'BANK',
+  'CREDIT_CARD',
+  'LOAN',
+  'INVESTMENT',
+];
 
 /** Amounts read as the user states them: a card or loan shows what is owed. */
 export function balancesByKind(

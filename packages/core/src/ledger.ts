@@ -189,7 +189,9 @@ export function buildAdjustment(
 
 /** Owed kinds hold a negative balance; the user states what they owe. */
 export function signedBalance(kind: AccountKind, stated: Paise): Paise {
-  return kind === 'BANK' || kind === 'RECEIVABLE' ? stated : -stated;
+  return kind === 'BANK' || kind === 'RECEIVABLE' || kind === 'INVESTMENT'
+    ? stated
+    : -stated;
 }
 
 export interface LedgerTx {

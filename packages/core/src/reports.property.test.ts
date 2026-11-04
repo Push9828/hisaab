@@ -3,7 +3,14 @@ import { expect, it } from 'vitest';
 
 import { CATEGORIES } from './categories';
 import { istMonthRange } from './dates';
-import { type ReportTx, cashFlow, people, spendByCategory } from './reports';
+import {
+  type ReportTx,
+  cashFlow,
+  netInvested,
+  people,
+  savingsRate,
+  spendByCategory,
+} from './reports';
 import { type AccountInfo } from './types';
 
 // SPEC section 4 report rules over random rows. Expected totals are computed
@@ -288,6 +295,106 @@ it('people totals net to the sum of person balances, with no zero rows', () => {
       const net = accounts.reduce((s, a) => s + a.balance, 0n);
       expect(p.owesMeTotal - p.iOweTotal).toBe(net);
       expect([...p.owesMe, ...p.iOwe].every((x) => x.amount > 0n)).toBe(true);
+    }),
+    { numRuns: 1000 },
+  );
+});
+
+const INVESTMENT_ACCOUNTS: AccountInfo[] = [
+  { id: 'bank', alias: 'bank', name: 'Bank', kind: 'BANK', balance: 0n },
+  { id: 'fund', alias: 'fund', name: 'Fund', kind: 'INVESTMENT', balance: 0n },
+  {
+    id: 'other',
+    alias: 'other',
+    name: 'Other',
+    kind: 'INVESTMENT',
+    balance: 0n,
+  },
+];
+
+const transferBetween = (
+  from: string,
+  to: string,
+  a: bigint,
+): Omit<ReportTx, 'occurredAt' | 'voidedAt'> => ({
+  type: 'TRANSFER',
+  category: null,
+  spendAmount: 0n,
+  entries: [
+    { accountId: from, amount: -a },
+    { accountId: to, amount: a },
+  ],
+});
+
+/** A buy, a sale or a fund-to-fund move, with the change it makes to Invested. */
+const investmentMove = fc.oneof(
+  amount.map((a) => ({ tx: transferBetween('bank', 'fund', a), invested: a })),
+  amount.map((a) => ({ tx: transferBetween('fund', 'bank', a), invested: -a })),
+  amount.map((a) => ({
+    tx: transferBetween('fund', 'other', a),
+    invested: 0n,
+  })),
+);
+
+const liveMove = (m: { tx: Omit<ReportTx, 'occurredAt' | 'voidedAt'> }) =>
+  live({ ...base, tx: m.tx });
+
+it('SPEC invariant 7: investment moves change no out, net, savings rate or spend', () => {
+  fc.assert(
+    fc.property(
+      fc.array(generated),
+      fc.array(investmentMove),
+      (rows, moves) => {
+        const txs = rows.map(live);
+        const withMoves = [...txs, ...moves.map(liveMove)];
+        const before = cashFlow(txs, OCTOBER);
+        const after = cashFlow(withMoves, OCTOBER);
+        expect(after).toEqual(before);
+        expect(savingsRate(after)).toBe(savingsRate(before));
+        expect(spendByCategory(withMoves, OCTOBER)).toEqual(
+          spendByCategory(txs, OCTOBER),
+        );
+      },
+    ),
+    { numRuns: 1000 },
+  );
+});
+
+// Not reachable through the bot, which refuses it. Must still not count.
+const adjustmentOnFund = amount.map((a): Generated => ({
+  ...base,
+  tx: {
+    type: 'ADJUSTMENT',
+    category: null,
+    spendAmount: 0n,
+    entries: [{ accountId: 'fund', amount: a }],
+  },
+}));
+
+it('Invested matches the generated moves, and nothing else counts', () => {
+  fc.assert(
+    fc.property(
+      fc.array(fc.oneof(generated, adjustmentOnFund)),
+      fc.array(investmentMove),
+      (rows, moves) => {
+        const txs = [...rows.map(live), ...moves.map(liveMove)];
+        const want = moves.reduce((s, m) => s + m.invested, 0n);
+        expect(netInvested(txs, INVESTMENT_ACCOUNTS, OCTOBER)).toBe(want);
+      },
+    ),
+    { numRuns: 1000 },
+  );
+});
+
+it('a voided or out-of-month move changes Invested by nothing', () => {
+  fc.assert(
+    fc.property(fc.array(investmentMove), investmentMove, (moves, extra) => {
+      const txs = moves.map(liveMove);
+      const voided = { ...liveMove(extra), voidedAt: new Date(0) };
+      const later = { ...liveMove(extra), occurredAt: OCTOBER.end };
+      expect(
+        netInvested([...txs, voided, later], INVESTMENT_ACCOUNTS, OCTOBER),
+      ).toBe(netInvested(txs, INVESTMENT_ACCOUNTS, OCTOBER));
     }),
     { numRuns: 1000 },
   );
