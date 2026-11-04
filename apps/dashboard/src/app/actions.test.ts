@@ -1,3 +1,5 @@
+import { inspect } from 'node:util';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { signIn, signOut } from './actions';
@@ -40,7 +42,8 @@ vi.mock('../lib/auth', () => ({
 const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 const expectNoSecretLogged = () => {
-  expect(JSON.stringify(logged.mock.calls)).not.toContain(SECRET);
+  // Not JSON.stringify: it turns an Error into {}, hiding the message.
+  expect(inspect(logged.mock.calls, { depth: null })).not.toContain(SECRET);
   expect(logged).toHaveBeenCalled();
 };
 

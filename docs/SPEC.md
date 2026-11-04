@@ -303,12 +303,12 @@ identity `seq`), `schema.ts` is the truth.
 | M3 | Channel adapter running locally behind a tunnel, end-to-end from the real chat app | Nov 2 |
 | M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
-| M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | next |
+| M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | Nov 4 |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
 
 Blog rule: a post is published only after its milestone's tests pass.
-HLD post after M3, LLD post after M2, parser post after M1, production post after M4.
+HLD post after M3, LLD post after M2, parser post after M1, production post after M4, dashboard post after M5.
 
 ## 11. Splitwise (v2, read-only)
 

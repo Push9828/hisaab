@@ -1,3 +1,5 @@
+import { inspect } from 'node:util';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from './route';
@@ -29,7 +31,10 @@ describe('GET callback', () => {
     expect(response.headers.get('location')).toBe(
       'http://localhost:3000/sign-in?error=1',
     );
-    expect(JSON.stringify(logged.mock.calls)).not.toContain('fake-session');
+    // Not JSON.stringify: it turns an Error into {}, hiding the message.
+    expect(inspect(logged.mock.calls, { depth: null })).not.toContain(
+      'fake-session',
+    );
     expect(logged).toHaveBeenCalled();
   });
 });
