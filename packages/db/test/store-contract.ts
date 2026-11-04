@@ -53,6 +53,21 @@ export function storeContract(name: string, make: () => Promise<LedgerStore>) {
       expect(await balance(store)).toBe(900n);
     });
 
+    it('stores and returns an INVESTMENT account', async () => {
+      const store = await make();
+      await store.run((db) =>
+        db.createAccount({
+          alias: 'fund',
+          name: 'FUND',
+          kind: 'INVESTMENT',
+          openingBalance: 500n,
+        }),
+      );
+      expect(await store.run((db) => db.accounts())).toMatchObject([
+        { alias: 'fund', kind: 'INVESTMENT', balance: 500n },
+      ]);
+    });
+
     it('rejects a duplicate alias and writes nothing', async () => {
       const store = await make();
       await seed(store);

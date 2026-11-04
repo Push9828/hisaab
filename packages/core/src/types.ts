@@ -2,7 +2,7 @@ import { type Category } from './categories';
 import { type Paise } from './money';
 
 export type AccountKind =
-  'BANK' | 'CREDIT_CARD' | 'RECEIVABLE' | 'PAYABLE' | 'LOAN';
+  'BANK' | 'CREDIT_CARD' | 'RECEIVABLE' | 'PAYABLE' | 'LOAN' | 'INVESTMENT';
 
 export type TxType = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'SPLIT' | 'ADJUSTMENT';
 export type TxStatus = 'CONFIRMED' | 'NEEDS_REVIEW';

@@ -28,6 +28,7 @@ export const accountKind = pgEnum('AccountKind', [
   'RECEIVABLE',
   'PAYABLE',
   'LOAN',
+  'INVESTMENT',
 ]);
 export const txType = pgEnum('TxType', [
   'INCOME',

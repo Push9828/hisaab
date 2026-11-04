@@ -1,0 +1,1 @@
+ALTER TYPE "public"."AccountKind" ADD VALUE 'INVESTMENT';
