@@ -18,8 +18,8 @@ import { type AccountInfo, type Entry } from './types';
 const positive = fc.bigInt({ min: 1n, max: 10_000_000_000n });
 const bank = ACCOUNTS.find((a) => a.alias === 'icici') as AccountInfo;
 const bom = ACCOUNTS.find((a) => a.alias === 'bom') as AccountInfo;
-const rahul = ACCOUNTS.find((a) => a.alias === 'rahul') as AccountInfo;
-const anita = ACCOUNTS.find((a) => a.alias === 'anita') as AccountInfo;
+const john = ACCOUNTS.find((a) => a.alias === 'john') as AccountInfo;
+const sam = ACCOUNTS.find((a) => a.alias === 'sam') as AccountInfo;
 
 describe('invariant 1: amounts are positive integers', () => {
   it('parseAmount round-trips whole rupees', () => {
@@ -134,7 +134,7 @@ describe('invariant 3: split arithmetic', () => {
         positive,
         fc.array(positive, { minLength: 1, maxLength: 2 }),
         (total, shares) => {
-          const people = [rahul, anita];
+          const people = [john, sam];
           const r = buildSplit(
             bank,
             total,
@@ -255,13 +255,13 @@ describe('interpret is total and never writes on bad input', () => {
       'xfer 25k icici bom',
       'pay icicicc 4k from icici',
       'emi 32k bom',
-      'lend rahul 10k icici',
-      'got rahul 5k icici',
-      'dinner 4000 split rahul 1000 anita 1000 cc icici',
-      'dinner 4000 split rahul 1000 icici',
+      'lend john 10k icici',
+      'got john 5k icici',
+      'dinner 4000 split john 1000 sam 1000 cc icici',
+      'dinner 4000 split john 1000 icici',
       'bal icici 85000',
       'bal icicicc',
-      'open sam 0 receivable',
+      'open alex 0 receivable',
       'accounts',
       'undo',
     ].map((m) => m.split(' '));
@@ -275,7 +275,7 @@ describe('interpret is total and never writes on bad input', () => {
       '0',
       '31',
       '2025',
-      'rahul',
+      'john',
       '1,2',
       '4k',
       'icici',

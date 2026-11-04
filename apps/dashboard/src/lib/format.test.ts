@@ -28,8 +28,8 @@ describe('percent', () => {
 
 describe('initials', () => {
   it('takes up to two', () => {
-    expect(initials('RAHUL')).toBe('RA');
-    expect(initials('Rahul Fake Name')).toBe('RF');
+    expect(initials('JOHN')).toBe('JO');
+    expect(initials('John Fake Name')).toBe('JF');
     expect(initials('x')).toBe('X');
   });
 });

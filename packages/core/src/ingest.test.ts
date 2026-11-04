@@ -112,20 +112,20 @@ describe('ingest: SPEC section 5 examples, persisted', () => {
 
   it('5. lend and repayment are transfers', async () => {
     const { send, balance, spend } = setup();
-    await send('lend rahul 10k icici');
-    expect(await balance('rahul')).toBe(1_000_000n);
-    await send('got rahul 5k icici');
-    expect(await balance('rahul')).toBe(500_000n);
+    await send('lend john 10k icici');
+    expect(await balance('john')).toBe(1_000_000n);
+    await send('got john 5k icici');
+    expect(await balance('john')).toBe(500_000n);
     expect(await balance('icici')).toBe(8_420_000n - 1_000_000n + 500_000n);
     expect(spend()).toBe(0n);
   });
 
   it('6. split spend is only my share', async () => {
     const { send, balance, spend } = setup();
-    await send('dinner 4000 split rahul 1000 anita 1000 cc icici');
+    await send('dinner 4000 split john 1000 sam 1000 cc icici');
     expect(await balance('icicicc')).toBe(-150_000n - 400_000n);
-    expect(await balance('rahul')).toBe(100_000n);
-    expect(await balance('anita')).toBe(100_000n);
+    expect(await balance('john')).toBe(100_000n);
+    expect(await balance('sam')).toBe(100_000n);
     expect(spend()).toBe(200_000n);
   });
 

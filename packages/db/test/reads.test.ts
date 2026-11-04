@@ -51,8 +51,8 @@ async function openAccounts() {
         openingBalance: -150_000n,
       },
       { alias: 'bom', name: 'BOM', kind: 'BANK', openingBalance: 5_000_000n },
-      { alias: 'rahul', name: 'Rahul', kind: 'RECEIVABLE', openingBalance: 0n },
-      { alias: 'anita', name: 'Anita', kind: 'RECEIVABLE', openingBalance: 0n },
+      { alias: 'john', name: 'John', kind: 'RECEIVABLE', openingBalance: 0n },
+      { alias: 'sam', name: 'Sam', kind: 'RECEIVABLE', openingBalance: 0n },
     ] as const) {
       await txn.createAccount(account);
     }
@@ -106,10 +106,7 @@ describe('readAccounts', () => {
 describe('readTransactions', () => {
   it('returns the row and its entries, in creation order', async () => {
     await openAccounts();
-    await send(
-      'emi 32k bom',
-      'dinner 4000 split rahul 1000 anita 1000 cc icici',
-    );
+    await send('emi 32k bom', 'dinner 4000 split john 1000 sam 1000 cc icici');
     const accounts = await readAccounts(db);
     const idOf = (alias: string) => accounts.find((a) => a.alias === alias)?.id;
 
@@ -130,8 +127,8 @@ describe('readTransactions', () => {
         voidedAt: null,
         entries: expect.arrayContaining([
           { accountId: idOf('icicicc'), amount: -400_000n },
-          { accountId: idOf('rahul'), amount: 100_000n },
-          { accountId: idOf('anita'), amount: 100_000n },
+          { accountId: idOf('john'), amount: 100_000n },
+          { accountId: idOf('sam'), amount: 100_000n },
         ]),
       },
     ]);
@@ -221,9 +218,9 @@ describe('core reports over Postgres reads', () => {
       'pay icicicc 4k from icici',
       'xfer 25k icici bom',
       'emi 32k bom',
-      'lend rahul 10k icici',
-      'got rahul 5k icici',
-      'dinner 4000 split rahul 1000 anita 1000 cc icici',
+      'lend john 10k icici',
+      'got john 5k icici',
+      'dinner 4000 split john 1000 sam 1000 cc icici',
       'in 85k salary icici',
     );
     const txs = await readTransactions(db, OCTOBER);
@@ -241,8 +238,8 @@ describe('core reports over Postgres reads', () => {
     });
     expect(people(await readAccounts(db))).toMatchObject({
       owesMe: [
-        { name: 'Rahul', amount: 600_000n },
-        { name: 'Anita', amount: 100_000n },
+        { name: 'John', amount: 600_000n },
+        { name: 'Sam', amount: 100_000n },
       ],
       owesMeTotal: 700_000n,
     });

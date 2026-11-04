@@ -20,7 +20,7 @@ describe('ambiguous input writes nothing and asks', () => {
     ['petrol 4k', 'MISSING_ACCOUNT'],
     ['petrol 4k nope', 'UNKNOWN_ACCOUNT'],
     ['petrol 4k cc nope', 'UNKNOWN_ACCOUNT'],
-    ['petrol 4k rahul', 'KIND_MISMATCH'],
+    ['petrol 4k john', 'KIND_MISMATCH'],
     ['petrol 4k icici bom', 'UNKNOWN_ACCOUNT'],
     ['4k icici', 'MISSING_DESCRIPTION'],
     ['petrol 1,200 icici', 'BAD_AMOUNT'],
@@ -41,23 +41,23 @@ describe('ambiguous input writes nothing and asks', () => {
     ['pay icicicc 4k via icici', 'UNKNOWN_COMMAND'],
     ['pay rent 15k icici', 'UNKNOWN_COMMAND'],
     ['emi 32k', 'MISSING_ACCOUNT'],
-    ['emi 32k rahul', 'KIND_MISMATCH'],
-    ['lend sam 10k icici', 'UNKNOWN_ACCOUNT'],
-    ['lend rahul 10k', 'MISSING_ACCOUNT'],
-    ['lend rahul 10k icicicc', 'KIND_MISMATCH'],
+    ['emi 32k john', 'KIND_MISMATCH'],
+    ['lend alex 10k icici', 'UNKNOWN_ACCOUNT'],
+    ['lend john 10k', 'MISSING_ACCOUNT'],
+    ['lend john 10k icicicc', 'KIND_MISMATCH'],
     ['lend icici 10k bom', 'KIND_MISMATCH'],
     ['got milk 50 icici', 'UNKNOWN_ACCOUNT'],
     ['dinner 4000 split', 'BAD_SPLIT'],
-    ['dinner 4000 split rahul 1000', 'MISSING_ACCOUNT'],
-    ['dinner 4000 split rahul cc icici', 'BAD_SPLIT'],
-    ['dinner 4000 split rahul 1000 anita cc icici', 'BAD_SPLIT'],
+    ['dinner 4000 split john 1000', 'MISSING_ACCOUNT'],
+    ['dinner 4000 split john cc icici', 'BAD_SPLIT'],
+    ['dinner 4000 split john 1000 sam cc icici', 'BAD_SPLIT'],
     ['dinner 4000 split cc icici', 'BAD_SPLIT'],
-    ['dinner 4000 split rahul 5000 icici', 'SPLIT_EXCEEDS_TOTAL'],
-    ['dinner 4000 split rahul 3000 anita 2000 icici', 'SPLIT_EXCEEDS_TOTAL'],
-    ['dinner 4000 split rahul 0 icici', 'BAD_SPLIT'],
-    ['dinner 4000 split rahul 1000 rahul 1000 icici', 'BAD_SPLIT'],
-    ['dinner 4000 split sam 1000 icici', 'UNKNOWN_ACCOUNT'],
-    ['dinner 4000 split rahul 1,000 icici', 'BAD_AMOUNT'],
+    ['dinner 4000 split john 5000 icici', 'SPLIT_EXCEEDS_TOTAL'],
+    ['dinner 4000 split john 3000 sam 2000 icici', 'SPLIT_EXCEEDS_TOTAL'],
+    ['dinner 4000 split john 0 icici', 'BAD_SPLIT'],
+    ['dinner 4000 split john 1000 john 1000 icici', 'BAD_SPLIT'],
+    ['dinner 4000 split alex 1000 icici', 'UNKNOWN_ACCOUNT'],
+    ['dinner 4000 split john 1,000 icici', 'BAD_AMOUNT'],
     ['bal 5000', 'MISSING_ACCOUNT'],
     ['bal nope', 'UNKNOWN_ACCOUNT'],
     ['bal icici 1,000', 'BAD_AMOUNT'],
@@ -84,9 +84,9 @@ describe('ambiguous input writes nothing and asks', () => {
   });
 
   it('points to "open" when a person is unknown', () => {
-    expect(interpret('lend sam 10k icici', ctx())).toMatchObject({
+    expect(interpret('lend alex 10k icici', ctx())).toMatchObject({
       kind: 'clarify',
-      question: expect.stringContaining('open sam 0 receivable'),
+      question: expect.stringContaining('open alex 0 receivable'),
     });
   });
 });
@@ -135,7 +135,7 @@ describe('spending never carries an income category', () => {
 
 describe('got', () => {
   it('may exceed what is owed (documented: SPEC section 6)', () => {
-    expect(interpret('got rahul 5k icici', ctx())).toMatchObject({
+    expect(interpret('got john 5k icici', ctx())).toMatchObject({
       kind: 'proposal',
       tx: { type: 'TRANSFER', spendAmount: 0n },
     });
@@ -144,19 +144,19 @@ describe('got', () => {
 
 describe('split', () => {
   it('allows the own share to be zero', () => {
-    const r = interpret('lunch 2000 split rahul 1000 anita 1000 icici', ctx());
+    const r = interpret('lunch 2000 split john 1000 sam 1000 icici', ctx());
     expect(r).toMatchObject({ kind: 'proposal', tx: { spendAmount: 0n } });
   });
 
   it('works with a bank payer and a single person', () => {
-    const r = interpret('lunch 500 split rahul 200 icici', ctx());
+    const r = interpret('lunch 500 split john 200 icici', ctx());
     expect(r).toMatchObject({
       kind: 'proposal',
       tx: {
         spendAmount: 30_000n,
         entries: [
           { accountId: id('icici'), amount: -50_000n },
-          { accountId: id('rahul'), amount: 20_000n },
+          { accountId: id('john'), amount: 20_000n },
         ],
       },
     });
@@ -182,12 +182,12 @@ describe('open, bal, accounts, undo', () => {
   });
 
   it('stores receivables as positive and allows a zero opening balance', () => {
-    expect(interpret('open sam 0 receivable', ctx())).toMatchObject({
+    expect(interpret('open alex 0 receivable', ctx())).toMatchObject({
       kind: 'open',
       accountKind: 'RECEIVABLE',
       openingBalance: 0n,
     });
-    expect(interpret('open sam 500 receivable', ctx())).toMatchObject({
+    expect(interpret('open alex 500 receivable', ctx())).toMatchObject({
       openingBalance: 50_000n,
     });
   });

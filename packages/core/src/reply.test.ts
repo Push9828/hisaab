@@ -39,8 +39,8 @@ describe('reply', () => {
   });
 
   it('confirms a split with every share', () => {
-    expect(say('dinner 4000 split rahul 1000 anita 1000 cc icici')).toBe(
-      'Logged: 4,000 Dinner (Food) on ICICI-CC. Your share 2,000; Rahul owes 1,000, Anita owes 1,000. Reply "undo" to revert.',
+    expect(say('dinner 4000 split john 1000 sam 1000 cc icici')).toBe(
+      'Logged: 4,000 Dinner (Food) on ICICI-CC. Your share 2,000; John owes 1,000, Sam owes 1,000. Reply "undo" to revert.',
     );
   });
 
@@ -70,8 +70,8 @@ describe('reply', () => {
         'ICICI: 84,200',
         'ICICI-CC: -1,500',
         'BOM: 50,000',
-        'Rahul: 0',
-        'Anita: 0',
+        'John: 0',
+        'Sam: 0',
       ].join('\n'),
     );
   });

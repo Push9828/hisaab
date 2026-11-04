@@ -14,8 +14,8 @@ export const ACCOUNTS: AccountInfo[] = [
   account('icici', 'ICICI', 'BANK', 8_420_000n),
   account('icicicc', 'ICICI-CC', 'CREDIT_CARD', -150_000n),
   account('bom', 'BOM', 'BANK', 5_000_000n),
-  account('rahul', 'Rahul', 'RECEIVABLE'),
-  account('anita', 'Anita', 'RECEIVABLE'),
+  account('john', 'John', 'RECEIVABLE'),
+  account('sam', 'Sam', 'RECEIVABLE'),
 ];
 
 export const ctx = (accounts: AccountInfo[] = ACCOUNTS): Context => ({

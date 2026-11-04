@@ -97,8 +97,8 @@ describe('seedFake', () => {
     const accounts = await readAccounts(db);
     expect(people(accounts)).toEqual({
       owesMe: [
-        { name: 'RAHUL', amount: rupees(6_000) },
-        { name: 'ANITA', amount: rupees(1_000) },
+        { name: 'JOHN', amount: rupees(6_000) },
+        { name: 'SAM', amount: rupees(1_000) },
       ],
       owesMeTotal: rupees(7_000),
       iOwe: [{ name: 'RAVI', amount: rupees(3_000) }],

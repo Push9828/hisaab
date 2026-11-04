@@ -25,9 +25,9 @@ const EXAMPLES = [
   'pay icicicc 4k from icici',
   'xfer 25k icici bom',
   'emi 32k bom',
-  'lend rahul 10k icici',
-  'got rahul 5k icici',
-  'dinner 4000 split rahul 1000 anita 1000 cc icici',
+  'lend john 10k icici',
+  'got john 5k icici',
+  'dinner 4000 split john 1000 sam 1000 cc icici',
   'in 85k salary icici',
 ];
 
@@ -187,14 +187,12 @@ describe('cashFlow', () => {
   });
 
   it('counts only your share of a split, not the payer total', async () => {
-    const txs = await ledger(
-      'dinner 4000 split rahul 1000 anita 1000 cc icici',
-    );
+    const txs = await ledger('dinner 4000 split john 1000 sam 1000 cc icici');
     expect(cashFlow(txs, OCTOBER).out).toBe(200_000n);
   });
 
   it('counts nothing for lending and repayment', async () => {
-    const txs = await ledger('lend rahul 10k icici', 'got rahul 5k icici');
+    const txs = await ledger('lend john 10k icici', 'got john 5k icici');
     expect(cashFlow(txs, OCTOBER)).toEqual({
       in: 0n,
       out: 0n,
@@ -253,12 +251,12 @@ describe('cashFlow', () => {
 });
 
 describe('people', () => {
-  it('SPEC section 5: Rahul owes 6,000 and Anita 1,000', async () => {
+  it('SPEC section 5: John owes 6,000 and Sam 1,000', async () => {
     const accounts = await accountsAfter(...EXAMPLES);
     expect(people(accounts)).toEqual({
       owesMe: [
-        { name: 'Rahul', amount: 600_000n },
-        { name: 'Anita', amount: 100_000n },
+        { name: 'John', amount: 600_000n },
+        { name: 'Sam', amount: 100_000n },
       ],
       owesMeTotal: 700_000n,
       iOwe: [],
