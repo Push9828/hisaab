@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { ingest, type LedgerStore } from '@hisaab/core';
+import { ingest, type Categorizer, type LedgerStore } from '@hisaab/core';
 
 export interface WebhookConfig {
   secret: string;
@@ -10,7 +10,14 @@ export interface WebhookConfig {
 
 /** The only things the adapter ever logs. Never text, balances or errors (hard rule 8). */
 export type LogLabel =
-  'unauthorized' | 'ignored' | 'processed' | 'duplicate' | 'error';
+  | 'unauthorized'
+  | 'ignored'
+  | 'processed'
+  | 'duplicate'
+  | 'error'
+  | 'llm_guessed'
+  | 'llm_unsure'
+  | 'llm_failed';
 
 export interface WebhookRequest {
   /** Lowercase header names, as `node:http` gives them. */
@@ -34,6 +41,8 @@ export interface WebhookDeps {
   config: WebhookConfig;
   store: LedgerStore;
   log: (label: LogLabel) => void;
+  /** Absent means keyword rules only. */
+  categorizer?: Categorizer | undefined;
 }
 
 /** The fields we read from a Telegram `Message`. Everything else is ignored. */
@@ -87,7 +96,7 @@ export function parseConfig(
  */
 export async function handleWebhook(
   req: WebhookRequest,
-  { config, store, log }: WebhookDeps,
+  { config, store, log, categorizer }: WebhookDeps,
 ): Promise<WebhookResponse> {
   if (!hasValidSecret(req.headers, config.secret)) {
     log('unauthorized');
@@ -118,7 +127,9 @@ export async function handleWebhook(
         now: new Date(message.date * 1000),
       },
       store,
+      categorizer,
     );
+    if (result.llm) log(`llm_${result.llm}`);
     log(result.duplicate ? 'duplicate' : 'processed');
     // Telegram rejects an empty sendMessage; send nothing instead.
     return result.reply ? send(result.reply) : { status: 200 };

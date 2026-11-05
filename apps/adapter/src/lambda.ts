@@ -2,6 +2,7 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
+import { type Categorizer } from '@hisaab/core';
 import {
   createDb,
   DrizzleStore,
@@ -15,6 +16,7 @@ import {
   type HttpApiResult,
   type HttpLogLabel,
 } from './http-api';
+import { sarvamCategorizer } from './sarvam';
 import { parseConfig, type WebhookConfig } from './telegram';
 
 /**
@@ -27,6 +29,7 @@ import { parseConfig, type WebhookConfig } from './telegram';
 interface Settings {
   config: WebhookConfig;
   databaseUrl: string;
+  categorizer: Categorizer | undefined;
 }
 
 /** The keys we read from the one JSON secret. Values must be strings. */
@@ -34,6 +37,7 @@ const KEYS = [
   'TELEGRAM_WEBHOOK_SECRET',
   'TELEGRAM_ALLOWED_USER_ID',
   'DATABASE_URL',
+  'SARVAM_API_KEY',
 ] as const;
 
 const log = (label: HttpLogLabel) => console.log(label);
@@ -70,7 +74,14 @@ async function fetchSettings(): Promise<Settings> {
   if (!values.DATABASE_URL) throw new Error('DATABASE_URL is not set');
   // Fails here, with the 500-and-retry path, rather than on every message.
   parseDatabaseUrl(values.DATABASE_URL);
-  return { config, databaseUrl: values.DATABASE_URL };
+  return {
+    config,
+    databaseUrl: values.DATABASE_URL,
+    // Optional, so that removing it from the secret switches the fallback off.
+    categorizer: values.SARVAM_API_KEY
+      ? sarvamCategorizer(values.SARVAM_API_KEY)
+      : undefined,
+  };
 }
 
 export async function handler(event: HttpApiEvent): Promise<HttpApiResult> {
@@ -101,6 +112,7 @@ export async function handler(event: HttpApiEvent): Promise<HttpApiResult> {
       config: settingsNow.config,
       store: new DrizzleStore(created.db),
       log,
+      categorizer: settingsNow.categorizer,
     });
   } catch {
     log('error');

@@ -1,5 +1,13 @@
 export { CATEGORIES, SPENDING_CATEGORIES, type Category } from './categories';
 export {
+  CATEGORY_PROMPT,
+  categoryRequest,
+  fallbackText,
+  parseCategoryAnswer,
+  type Categorizer,
+  type CategoryOutcome,
+} from './category-fallback';
+export {
   istMonthOf,
   istMonthRange,
   parseMonth,

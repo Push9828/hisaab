@@ -11,7 +11,8 @@ Parameters:
     Default: hisaab/webhook
     Description: >-
       Secrets Manager secret name (not ARN). A JSON object with string values for
-      TELEGRAM_WEBHOOK_SECRET, TELEGRAM_ALLOWED_USER_ID and DATABASE_URL.
+      TELEGRAM_WEBHOOK_SECRET, TELEGRAM_ALLOWED_USER_ID and DATABASE_URL, and
+      optionally SARVAM_API_KEY.
     AllowedPattern: '^[A-Za-z0-9/_+=.@-]+$'
 
 Resources:
@@ -31,8 +32,9 @@ Resources:
       Runtime: nodejs22.x
       Architectures: [arm64]
       MemorySize: 256
-      # The overall bound on one message: above the 5s connect timeout and the
-      # 10s per-statement timeout, below API Gateway's 30s integration limit.
+      # A kill switch on one message, not a sum of its parts: above the 5s connect
+      # timeout, the 10s per-statement timeout and the 3s Sarvam timeout, below API
+      # Gateway's 30s integration limit. A kill rolls back, and Telegram retries.
       Timeout: 20
       LoggingConfig:
         LogGroup: !Ref WebhookLogs

@@ -55,6 +55,8 @@ const KEYWORDS: Partial<Record<Category, string[]>> = {
     'cab',
     'parking',
     'fastag',
+    'toll',
+    'rapido',
   ],
   Rent: ['rent'],
   Utilities: [
@@ -65,12 +67,22 @@ const KEYWORDS: Partial<Record<Category, string[]>> = {
     'wifi',
     'broadband',
     'recharge',
+    'dth',
+    'lpg',
   ],
   Shopping: ['amazon', 'flipkart', 'myntra', 'clothes', 'shoes'],
   Entertainment: ['movie', 'movies', 'pvr', 'concert', 'games'],
   Health: ['doctor', 'medicine', 'pharmacy', 'hospital', 'gym'],
   Travel: ['flight', 'hotel', 'train', 'irctc', 'trip'],
-  Subscriptions: ['netflix', 'spotify', 'prime', 'youtube', 'icloud'],
+  Subscriptions: [
+    'netflix',
+    'spotify',
+    'prime',
+    'youtube',
+    'icloud',
+    'hotstar',
+    'zee5',
+  ],
   Salary: ['salary', 'payroll'],
 };
 

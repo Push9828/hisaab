@@ -23,6 +23,18 @@ describe('reply', () => {
     );
   });
 
+  it('marks a guessed category, because it needs review', () => {
+    const result = interpret('mystery 500 icici', ctx());
+    if (result.kind !== 'proposal') throw new Error('expected a proposal');
+    const guessed = {
+      ...result,
+      tx: { ...result.tx, category: 'Food' as const },
+    };
+    expect(reply(guessed, ctx())).toBe(
+      'Logged: 500 Mystery (Food, guessed) on ICICI. Reply "undo" to revert.',
+    );
+  });
+
   it('confirms income', () => {
     expect(say('in 85k salary icici')).toBe(
       'Logged: 85,000 Salary (Salary) into ICICI. Reply "undo" to revert.',

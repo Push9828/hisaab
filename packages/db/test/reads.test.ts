@@ -21,10 +21,10 @@ import {
   countConfirmedWithKeyword,
   readAccountNames,
   readOnly,
-  readUncategorised,
+  readNeedsReview,
 } from '../src/reads';
 
-import type { Category } from '@hisaab/core';
+import type { Categorizer, Category } from '@hisaab/core';
 
 // All names and numbers are fake. Amounts are paise.
 const { db, pool } = createDb(
@@ -65,6 +65,10 @@ async function openAccounts() {
     }
   });
 }
+
+const answering = (category: string): Categorizer => ({
+  ask: () => Promise.resolve(JSON.stringify({ category })),
+});
 
 async function send(...messages: string[]) {
   for (const [i, text] of messages.entries()) {
@@ -126,11 +130,77 @@ describe('keyword suggestion reads', () => {
       'kurta 900 icici',
       'undo',
     );
-    const rows = await read(readUncategorised);
+    const rows = await read(readNeedsReview);
     expect(rows.sort((a, b) => a.count - b.count)).toEqual([
       { description: 'samosa', count: 1 },
       { description: 'chai', count: 2 },
     ]);
+  });
+
+  describe('a guessed row', () => {
+    const guess = (externalId: string, text: string, category = 'Food') =>
+      ingest(
+        { channel: 'test', externalId, text, now: NOW },
+        store,
+        answering(category),
+      );
+
+    it('stores the category with status NEEDS_REVIEW, and reports count it', async () => {
+      await openAccounts();
+      await guess('g', 'chai 20 icici');
+      const [row] = await db.select().from(transactions);
+      expect(row).toMatchObject({ category: 'Food', status: 'NEEDS_REVIEW' });
+      expect(
+        spendByCategory(await readTransactions(db, OCTOBER), OCTOBER),
+      ).toEqual([{ category: 'Food', total: 2_000n }]);
+    });
+
+    it('stays in the keyword script input, grouped with unanswered rows', async () => {
+      await openAccounts();
+      await guess('g', 'chai 20 icici');
+      await send('chai 30 icici');
+      expect(await read(readNeedsReview)).toEqual([
+        { description: 'chai', count: 2 },
+      ]);
+    });
+
+    it('is not a confirmed row when counting keyword conflicts', async () => {
+      await openAccounts();
+      await guess('g', 'doctor bill 100 icici', 'Food');
+      expect(
+        await read((t) => countConfirmedWithKeyword(t, 'bill', 'Utilities')),
+      ).toBe(1);
+      await guess('h', 'chai bill 100 icici', 'Food');
+      expect(
+        await read((t) => countConfirmedWithKeyword(t, 'bill', 'Utilities')),
+      ).toBe(1);
+    });
+
+    it('a pending call does not hold the ledger lock', async () => {
+      await openAccounts();
+      // A second message inside the call would wait out the 10s statement
+      // timeout if the first still held the advisory lock.
+      const out = await ingest(
+        { channel: 'test', externalId: 'a', text: 'chai 20 icici', now: NOW },
+        store,
+        {
+          ask: async () => {
+            await ingest(
+              {
+                channel: 'test',
+                externalId: 'b',
+                text: 'lunch 100 icici',
+                now: NOW,
+              },
+              store,
+            );
+            return JSON.stringify({ category: 'Food' });
+          },
+        },
+      );
+      expect(out.llm).toBe('guessed');
+      expect(await db.select().from(transactions)).toHaveLength(2);
+    });
   });
 
   it('reads the alias, name and kind of every account', async () => {

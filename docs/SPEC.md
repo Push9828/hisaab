@@ -68,8 +68,9 @@ card bill payments and internal transfers out of spending.
 **Monthly reports** cover one calendar month in IST (`occurredAt` in a half-open range) and
 exclude voided transactions.
 
-- **Spend by category**: sum of `spendAmount` per category. A null category (`NEEDS_REVIEW`)
-  goes in "Uncategorised", so the category total always equals total spend.
+- **Spend by category**: sum of `spendAmount` per category. A null category goes in "Uncategorised",
+  so the category total always equals total spend. A guessed category (section 6) counts under that
+  category, and the dashboard does not mark it as a guess.
 - **Cash flow**: in = sum of INCOME entry amounts; out = sum of `spendAmount`; net = in - out.
   ADJUSTMENT amounts are shown as a separate "reconcile corrections" line, outside net.
   - A card spend counts in out when you swipe. It lowers the card balance, not a bank balance.
@@ -120,6 +121,7 @@ Amounts in rupees for readability. Real values are paise.
 7. **Income**: `in 85k salary icici` is INCOME. ICICI +85000.
 8. **Reconcile**: `bal icici 85000` when the ledger says 84200 creates an
    ADJUSTMENT of +800 and replies with the difference.
+
 9. **Buy an investment**: `xfer 10k icici mfalpha`
    TRANSFER. ICICI -10000, MFALPHA +10000. spendAmount 0. Invested +10000. Out and net unchanged.
 10. **Sale for more than went in**: with MFALPHA at 10000, `xfer 12k mfalpha icici`
@@ -130,9 +132,20 @@ Amounts in rupees for readability. Real values are paise.
 12. **Investment reconcile refused**: `bal mfalpha 15000` (or any amount, including 0) replies with a
     clarifying question and writes nothing. `bal mfalpha` alone still shows the balance.
 
+Category fallback: the LLM's answer is given in each example, and only the category can differ from a run with no LLM.
+
+13. **Guess**: `chai 20 icici`, LLM answers Food. EXPENSE. ICICI -20. spendAmount 20. Category Food, status `NEEDS_REVIEW`.
+    Reply: `Logged: 20 Chai (Food, guessed) on ICICI. Reply "undo" to revert.`
+14. **Guess on a split**: `momos 900 split john 300 icici`, LLM answers Food. SPLIT. ICICI -900, JOHN +300.
+    spendAmount 600. Category Food, status `NEEDS_REVIEW`.
+15. **No usable answer**: `asdf 100 icici`, LLM answers `unsure`, answers something off the list, or fails. EXPENSE.
+    ICICI -100. spendAmount 100. Null category, status `NEEDS_REVIEW`. Reply says the category needs review.
+16. **Nothing to send**: `john 500 icici` when `john` is an account. No call. Stored as in example 15.
+17. **Keyword hit**: example 1 makes no call, and stays Transport and `CONFIRMED`.
+
 ## 6. Message grammar (final, M1)
 
-Deterministic, tokenized, case-insensitive. No LLM. Implemented in `packages/core`.
+Deterministic, tokenized, case-insensitive. No LLM in parsing. Implemented in `packages/core`.
 
 ```
 [<date>] <desc...> <amount> <account>              expense
@@ -177,18 +190,19 @@ undo                                               void the latest non-voided tr
 - Anything ambiguous returns a clarifying question and writes **nothing**: unknown command,
   missing or unknown account, missing description, more than one amount, bad amount, bad or
   future date, wrong account kind, same account twice, bad split, duplicate or reserved alias.
-- Unrecognised category (expenses and splits): keyword rules only. No match, keywords from
-  two categories, or an income category such as "salary advance", stores the transaction with a
-  null category and status `NEEDS_REVIEW`. Income is `Salary` on a salary keyword, else `Other income`.
+- Unrecognised category (expenses and splits): no keyword match, keywords from two categories, or an
+  income category such as "salary advance", stores the transaction with status `NEEDS_REVIEW`. The category is
+  the LLM's guess if it gave one (see Categories below), else null. Income is `Salary` on a salary keyword, else `Other income`.
 
 Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI-CC. Reply "undo" to revert.`
 
 **Categories** (fixed): Food, Groceries, Transport, Rent, Utilities, Shopping, Entertainment,
-Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. Today no LLM assigns a
-category: it comes from the keyword rules, the `emi` command or the income default, and no LLM runs in the bot or the dashboard.
-A planned fallback (M5.3) covers expenses and splits after the keyword rules. It may only choose from this list, excluding the
-income categories, or answer `unsure`, given the free-text description; `unsure` leaves the entry `NEEDS_REVIEW`. It never
-sees or alters amounts, accounts, or type.
+Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. A category comes from the keyword rules, the `emi` command
+or the income default. On a miss in an expense or split, the fallback (M5.3) asks the LLM, given the filtered description only.
+It may only choose from this list, excluding the income categories, or answer `unsure`. It never sees or alters amounts, accounts
+or type. A guess keeps status `NEEDS_REVIEW` and the reply says `guessed`. An `unsure` answer, an answer off the list or a failed
+call leaves the category null, and the message is still logged. With no key configured, the bot uses keyword rules only. No
+LLM runs in the dashboard.
 
 ## 7. Architecture (HLD)
 
@@ -199,9 +213,9 @@ Telegram bot
 API Gateway -> Lambda: channel adapter
         |  verify secret token, allowlist sender, build key (chat.id:message_id)
         v
-packages/core: ingest(message, store) -> dedupe (claim key) -> parse -> validate -> ledger write
+packages/core: ingest(message, store, categorizer?) -> dedupe (claim key) -> parse -> validate -> ledger write
         |                                                        |
-        |                                                        +--> categorizer (keyword rules; LLM fallback planned, M5.3)
+        |                                                        +--> category: keyword rules, then on a miss the LLM (Sarvam)
         v
 Postgres (Supabase free tier, Mumbai ap-south-1) via Drizzle
         ^
@@ -211,6 +225,9 @@ Next.js dashboard (Better Auth + Google OAuth, email allowlist)
 
 Key decision: **`core` is pure and channel-agnostic.** Telegram is a
 thin adapter, so the channel can be swapped without touching ledger logic.
+
+The LLM call happens between two database transactions, never inside one, so a slow provider cannot hold the
+ledger lock. The first transaction finds the miss and writes nothing. The second checks and interprets again, claims and writes.
 
 Later: EventBridge -> Lambda for recurring rules (rent, SIP, monthly transfer) and
 for Splitwise polling.
@@ -294,11 +311,15 @@ identity `seq`), `schema.ts` is the truth.
 - Logs must not contain full message bodies or balances.
 - From M5.2, free-text descriptions go to the chosen LLM provider, and they may hold names and identifiers. Parsed amounts
   and accounts are not sent.
-- The M5.2 script (`llm:keywords`) drops account aliases, account names, a card's bank name and any token with a digit, so
+- The M5.2 script (`llm:keywords`) drops account aliases, account names, a card's bank name, any token with a digit and any word with an `@`, so
   `dinner with john` goes as `dinner with` if `john` is an account, and `card xx1234 fee` as `card fee`. It shows the owner the
   text and a code, and sends exactly that text only with `--send=<code>`. It cannot catch a person with no account, a
   relation, a place or a spelled-out amount. It writes no file, and on production it needs the `llm:keywords:prod` script and
   refuses to run unless its output is a terminal.
+- The M5.3 fallback runs only after the secret and sender checks. It applies the same filter, with the same limits, and sends
+  with no preview, one request per keyword miss. Text over 100 characters after the filter is not sent. It sends no parsed
+  amount, account or date, and no balance. It has a 3-second timeout, no retries and refuses redirects. Its text and answers
+  are never logged: only the labels `llm_guessed`, `llm_unsure` and `llm_failed`. Removing the key from the secret switches it off.
 - Keywords live in a public repo, so only national brands and generic words are added, never a local shop or a person.
 - The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
 - The bot token is never given to the Lambda: replies go back in the webhook response, so only the
@@ -315,8 +336,8 @@ identity `seq`), `schema.ts` is the truth.
 | M4 | Deploy Lambda behind API Gateway, secrets in Secrets Manager, webhook moved off the tunnel | Nov 8 |
 | M5 | Dashboard: balances, monthly spend by category, cash flow, owed-to-me | Nov 9 |
 | M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | Nov 4 |
-| M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them before adding any; no LLM in the bot | later |
-| M5.3 | Category fallback: on a keyword miss the LLM picks a spending category from the fixed list; a failed, invalid or `unsure` answer leaves the entry `NEEDS_REVIEW` | later |
+| M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them before adding any; no LLM in the bot | Nov 4 |
+| M5.3 | Category fallback: on a keyword miss the LLM picks a spending category from the fixed list; a guess stays `NEEDS_REVIEW` and the reply says so; a failed, invalid or `unsure` answer leaves the category null | Nov 5 |
 | M5.4 | Ledger questions: the LLM picks a fixed read-only report and its filters, and existing code calculates the answer. Needs the owner's change to hard rule 2 and a decision on section 3, because filters could name an account or type | later |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
@@ -348,12 +369,16 @@ is enough.
   sending `open`. A proper correction command would be a grammar change, not yet decided.
 - **Correcting older transactions**: `NEEDS_REVIEW` rows cannot be given a category, and `undo` only voids the
   latest transaction. Deferred until after M5; see DECISIONS.md (2026-11-01). So keywords from M5.2 only help future
-  messages: stored rows stay in "Uncategorised".
+  messages: a stored row keeps the category it has.
+- **A wrong guess counts under the wrong category.** In the 2026-11-05 test about 1 in 8 fake descriptions got a wrong
+  category, and answers vary between runs. The reply shows the guess. `undo` and a resend may return the same guess, and only
+  the latest entry can be undone, so the reliable fix is a keyword, then `undo` and a resend.
+- **The fallback reads Latin letters only.** Devanagari text and any word with a digit, such as `zee5`, are dropped before
+  sending, so those need a keyword.
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
 - Omitted account: DECIDED, reply with a clarifying question, write nothing.
 - Category list: DECIDED, fixed list in section 6. Add keywords as real use shows gaps.
-- LLM provider: OPEN. Sarvam is tried first, using `category-accuracy.ts` on fake descriptions. Haiku is the alternative.
-  The provider's retention and training terms are part of the choice.
+- LLM provider: DECIDED, Sarvam `sarvam-105b` with reasoning off. See DECISIONS.md (2026-11-05).
 - Real descriptions and an LLM provider: DECIDED, allowed for Sarvam. See section 9 and DECISIONS.md (2026-11-04).
 - Dashboard auth: DECIDED, Better Auth + Google OAuth with email allowlist.
 - Channel: DECIDED, Telegram (secret-token header instead of `X-Hub-Signature-256`). WhatsApp optional later.

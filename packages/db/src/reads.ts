@@ -73,14 +73,14 @@ export const readAccounts = (db: Db): Promise<AccountInfo[]> =>
  * The next three serve the owner's keyword suggestion script. They are not exported
  * from the package, and the dashboard's role cannot read `description`.
  */
-export async function readUncategorised(tx: Tx): Promise<DescriptionCount[]> {
+export async function readNeedsReview(tx: Tx): Promise<DescriptionCount[]> {
   const count = sql<number>`count(*)::int`;
   return tx
     .select({ description: transactions.description, count })
     .from(transactions)
     .where(
       and(
-        isNull(transactions.category),
+        // Guesses included: nobody has reviewed them, so they can still become keywords.
         eq(transactions.status, 'NEEDS_REVIEW'),
         isNull(transactions.voidedAt),
       ),

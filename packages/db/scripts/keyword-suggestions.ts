@@ -16,12 +16,12 @@ import {
   countConfirmedWithKeyword,
   readAccountNames,
   readOnly,
-  readUncategorised,
+  readNeedsReview,
 } from '../src/reads';
 import { SUPABASE_ROOT_CA } from '../src/supabase-ca';
 
 /**
- * Proposes keywords from uncategorised descriptions, for the owner to review:
+ * Proposes keywords from descriptions needing review, guesses included, for the owner to review:
  * `pnpm --filter @hisaab/db llm:keywords`, or `llm:keywords:prod` for production.
  * Shows what it would send and a code, then stops; add `--send=<code>` to call
  * Sarvam with exactly that text. It writes to no database or file. On production its
@@ -115,7 +115,7 @@ pool.on('error', () => undefined);
 
 try {
   const { rows, accounts } = await readOnly(db, async (tx) => ({
-    rows: await readUncategorised(tx),
+    rows: await readNeedsReview(tx),
     accounts: await readAccountNames(tx),
   }));
   const { texts, skippedEmpty, skippedKnown } = prepareBatch(
@@ -131,7 +131,7 @@ try {
 
   console.log(`database: ${target}`);
   console.log(
-    `uncategorised rows: ${String(rows.reduce((sum, r) => sum + r.count, 0))}`,
+    `rows needing review: ${String(rows.reduce((sum, r) => sum + r.count, 0))}`,
   );
   console.log(
     `skipped: ${String(skippedKnown)} rows with only known keywords, ${String(skippedEmpty)} rows with nothing left to send`,

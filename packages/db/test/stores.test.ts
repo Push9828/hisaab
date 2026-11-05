@@ -188,6 +188,23 @@ describe('ingest() through DrizzleStore', () => {
     expect(outs.map((o) => o.duplicate).sort()).toEqual([false, true]);
     expect(await spend()).toBe(400_000n);
   });
+
+  it('two concurrent deliveries of a keyword miss write once, whatever the LLM says', async () => {
+    const deliver = () =>
+      ingest(
+        {
+          channel: 'test',
+          externalId: 'r',
+          text: 'chai 20 icici',
+          now: new Date(),
+        },
+        store,
+        { ask: () => Promise.resolve('{"category":"Food"}') },
+      );
+    const outs = await Promise.all([deliver(), deliver()]);
+    expect(outs.map((o) => o.duplicate).sort()).toEqual([false, true]);
+    expect(await spend()).toBe(2_000n);
+  });
 });
 
 describe('DrizzleStore statement timeout', () => {

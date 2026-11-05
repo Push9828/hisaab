@@ -6,6 +6,7 @@ import {
 
 import { createDb, DrizzleStore } from '@hisaab/db';
 
+import { sarvamCategorizer } from './sarvam';
 import {
   handleWebhook,
   hasValidSecret,
@@ -27,6 +28,9 @@ if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
 
 const { db, pool } = createDb(process.env.DATABASE_URL);
 const store = new DrizzleStore(db);
+const categorizer = process.env.SARVAM_API_KEY
+  ? sarvamCategorizer(process.env.SARVAM_API_KEY)
+  : undefined;
 const log = (label: LogLabel | 'bad_request' | 'aborted') =>
   console.log(`${new Date().toISOString()} ${label}`);
 
@@ -98,7 +102,7 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
 
   const { status, body: reply } = await handleWebhook(
     { headers: req.headers, body },
-    { config, store, log },
+    { config, store, log, categorizer },
   );
   if (reply === undefined) {
     res.writeHead(status).end();

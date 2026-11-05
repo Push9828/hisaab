@@ -14,6 +14,17 @@ describe('categorize', () => {
     expect(categorize(description)).toBe(category);
   });
 
+  it.each([
+    ['hotstar', 'Subscriptions'],
+    ['zee5', 'Subscriptions'],
+    ['dth', 'Utilities'],
+    ['lpg cylinder', 'Utilities'],
+    ['toll', 'Transport'],
+    ['rapido', 'Transport'],
+  ])('matches %s from the fallback test', (description, category) => {
+    expect(categorize(description)).toBe(category);
+  });
+
   it('allows several keywords from the same category', () => {
     expect(categorize('swiggy dinner')).toBe('Food');
   });

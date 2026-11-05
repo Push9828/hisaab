@@ -47,16 +47,21 @@ export const aliasTokens = (aliases: readonly string[]): ReadonlySet<string> =>
   new Set(aliases.flatMap(tokenize));
 
 /**
- * What may leave for the LLM: no account word and no token with a digit, which
- * is where card numbers and flat numbers sit. It cannot catch a person with no
- * account, a relation, a place or a spelled-out amount, so the owner previews
- * the result first.
+ * What may leave for the LLM: no account word, no token with a digit, which is
+ * where card numbers and flat numbers sit, and no word with an `@`, which is an
+ * email or UPI handle. It cannot catch a person with no account, a relation, a
+ * place or a spelled-out amount. The script previews the result; the bot does not.
  */
 export const sendableText = (
   description: string,
   blocked: ReadonlySet<string>,
 ): string =>
-  tokenize(description)
+  tokenize(
+    description
+      .split(/\s+/)
+      .filter((word) => !word.includes('@'))
+      .join(' '),
+  )
     .filter((token) => !/[0-9]/.test(token) && !blocked.has(token))
     .join(' ');
 
@@ -118,7 +123,7 @@ export function parseSuggestion(
 }
 
 /**
- * Forecast only, because stored rows keep their null category: it says how a
+ * Forecast only, because stored rows keep the category they have: it says how a
  * future message like each row would go. A row counts if nothing resolves it
  * today and the keyword would leave it with exactly one category. Each keyword
  * is forecast alone.

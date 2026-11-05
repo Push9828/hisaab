@@ -56,8 +56,10 @@ function confirm(
   const total =
     first && first.amount < 0n ? -first.amount : (first?.amount ?? 0n);
   const label = `${formatInr(total)} ${capitalize(tx.description)}`;
+  // A category on a row under review came from the LLM (SPEC section 6).
+  const guessed = tx.status === 'NEEDS_REVIEW' ? ', guessed' : '';
   const category = tx.category
-    ? ` (${tx.category})`
+    ? ` (${tx.category}${guessed})`
     : ' (category needs review)';
   const account = first ? name(first.accountId) : 'account';
 

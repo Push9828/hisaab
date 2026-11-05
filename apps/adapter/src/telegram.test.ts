@@ -375,3 +375,88 @@ describe('handleWebhook: any thrown error, e.g. the store (hard rule 8)', () => 
     expect(inner.snapshot().transactions).toHaveLength(1);
   });
 });
+
+describe('handleWebhook: category fallback', () => {
+  const ACCOUNT = {
+    id: 'a',
+    alias: 'tbank',
+    name: 'TBANK',
+    kind: 'BANK',
+    openingBalance: 100_000n,
+  } as const;
+
+  function withCategorizer(ask: () => Promise<unknown>) {
+    const logs: LogLabel[] = [];
+    const spy = vi.fn(ask);
+    const post = (body: unknown, secret = SECRET) =>
+      handleWebhook(
+        {
+          headers: { 'x-telegram-bot-api-secret-token': secret },
+          body: JSON.stringify(body),
+        },
+        {
+          config: CONFIG,
+          store: new MemoryStore([ACCOUNT]),
+          log: (label) => logs.push(label),
+          categorizer: { ask: spy },
+        },
+      );
+    return { post, logs, spy };
+  }
+
+  it('replies with the guess and logs its label', async () => {
+    const { post, logs } = withCategorizer(() =>
+      Promise.resolve('{"category":"Food"}'),
+    );
+    expect(await post(update('chai 20 tbank'))).toEqual(
+      replyTo(
+        'Logged: 20 Chai (Food, guessed) on TBANK. Reply "undo" to revert.',
+      ),
+    );
+    expect(logs).toEqual(['llm_guessed', 'processed']);
+  });
+
+  it('logs unsure', async () => {
+    const { post, logs } = withCategorizer(() =>
+      Promise.resolve('{"category":"unsure"}'),
+    );
+    await post(update('asdf 20 tbank'));
+    expect(logs).toEqual(['llm_unsure', 'processed']);
+  });
+
+  it('a failed call still logs the message and logs labels only', async () => {
+    const lines: unknown[][] = [];
+    for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      vi.spyOn(console, m).mockImplementation((...args) => {
+        lines.push(args);
+      });
+    }
+    const { post, logs } = withCategorizer(() =>
+      Promise.reject(new Error('fake failure quoting chai 20 tbank')),
+    );
+    expect(await post(update('chai 20 tbank'))).toEqual(
+      replyTo(
+        'Logged: 20 Chai (category needs review) on TBANK. Reply "undo" to revert.',
+      ),
+    );
+    expect(logs).toEqual(['llm_failed', 'processed']);
+    expect(lines).toEqual([]);
+  });
+
+  it('a keyword hit makes no call and logs no llm label', async () => {
+    const { post, logs, spy } = withCategorizer(() => Promise.resolve(null));
+    await post(update('petrol 20 tbank'));
+    expect(spy).not.toHaveBeenCalled();
+    expect(logs).toEqual(['processed']);
+  });
+
+  it.each([
+    ['a wrong secret', {}, 'wrong-secret'],
+    ['a stranger', { fromId: STRANGER }, SECRET],
+    ['a group chat', { chatType: 'group' }, SECRET],
+  ])('%s never reaches the LLM', async (_, overrides, secret) => {
+    const { post, spy } = withCategorizer(() => Promise.resolve(null));
+    await post(update('chai 20 tbank', overrides), secret);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

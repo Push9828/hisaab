@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { HttpApiEvent } from './http-api';
+import type { MemoryAccount } from '@hisaab/core';
 import type * as HisaabDb from '@hisaab/db';
 
 // All ids, secrets and URLs here are fake.
@@ -15,6 +16,7 @@ const pg = vi.hoisted(() => ({
   end: vi.fn<() => Promise<void>>(),
   on: vi.fn(),
   createDb: vi.fn(),
+  accounts: [] as MemoryAccount[],
 }));
 
 vi.mock('@aws-sdk/client-secrets-manager', () => ({
@@ -37,10 +39,10 @@ vi.mock('@hisaab/db', async () => {
       db: {},
       pool: { on: pg.on, end: pg.end },
     })),
-    // Ignores the db handle it is given; a fresh in-memory ledger each time.
+    // Ignores the db handle it is given; a fresh in-memory ledger each time, with pg.accounts.
     DrizzleStore: class extends MemoryStore {
       constructor() {
-        super();
+        super(pg.accounts);
       }
     },
   };
@@ -91,6 +93,7 @@ beforeEach(() => {
   pg.end.mockReset().mockResolvedValue();
   pg.on.mockClear();
   pg.createDb.mockClear();
+  pg.accounts = [];
   consoleCalls = [];
   for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) {
     vi.spyOn(console, m).mockImplementation((...args) => {
@@ -101,6 +104,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -160,6 +164,78 @@ describe('lambda handler', () => {
     const handler = await load();
     expect(await handler(event('accounts'))).toEqual({ statusCode: 500 });
     expect(consoleCalls).toEqual([['error']]);
+  });
+});
+
+describe('lambda handler: SARVAM_API_KEY is optional', () => {
+  const SARVAM_KEY = 'fake-sarvam-key';
+  const ACCOUNT = {
+    id: 'a',
+    alias: 'tbank',
+    name: 'TBANK',
+    kind: 'BANK',
+    openingBalance: 100_000n,
+  } as const;
+  const replyText = (body: string | undefined) =>
+    (JSON.parse(body ?? '') as { text: string }).text;
+
+  const fetchStub = vi.fn<typeof fetch>();
+
+  beforeEach(() => {
+    pg.accounts = [ACCOUNT];
+    fetchStub.mockReset().mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"category":"Food"}' } }],
+          }),
+        ),
+      ),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+  });
+
+  it('with the key, a miss is guessed and logs labels only', async () => {
+    aws.send.mockResolvedValue({
+      SecretString: secretString({ SARVAM_API_KEY: SARVAM_KEY }),
+    });
+    const handler = await load();
+    const res = await handler(event('chai 20 tbank'));
+    expect(replyText(res.body)).toContain('(Food, guessed)');
+    expect(fetchStub).toHaveBeenCalledOnce();
+    const [, init] = fetchStub.mock.calls[0] ?? [];
+    expect(init?.headers).toMatchObject({
+      'api-subscription-key': SARVAM_KEY,
+    });
+    expect(consoleCalls).toEqual([['llm_guessed'], ['processed']]);
+  });
+
+  it('with the key, a failed call still logs the entry and only labels', async () => {
+    aws.send.mockResolvedValue({
+      SecretString: secretString({ SARVAM_API_KEY: SARVAM_KEY }),
+    });
+    fetchStub.mockRejectedValue(
+      new Error(`request with ${SARVAM_KEY} for chai failed`),
+    );
+    const handler = await load();
+    const res = await handler(event('chai 20 tbank'));
+    expect(res.statusCode).toBe(200);
+    expect(replyText(res.body)).toContain('category needs review');
+    expect(consoleCalls).toEqual([['llm_failed'], ['processed']]);
+  });
+
+  it.each([
+    ['missing', {}],
+    ['empty', { SARVAM_API_KEY: '' }],
+    ['not a string', { SARVAM_API_KEY: 7 }],
+  ])('%s, the bot uses keyword rules only', async (_, overrides) => {
+    aws.send.mockResolvedValue({ SecretString: secretString(overrides) });
+    const handler = await load();
+    const res = await handler(event('chai 20 tbank'));
+    expect(res.statusCode).toBe(200);
+    expect(replyText(res.body)).toContain('category needs review');
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(consoleCalls).toEqual([['processed']]);
   });
 });
 

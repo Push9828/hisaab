@@ -14,7 +14,8 @@ takes the bot away from production until you run `webhook:set:prod` again.
 
 `handleWebhook` (`src/telegram.ts`) checks the secret header, then the message shape, then the
 sender. Anything it does not handle gets a silent 200. Logs are a startup line plus fixed labels
-(`unauthorized`, `ignored`, `processed`, `duplicate`, `error`, `bad_request`, and `aborted` locally), never
+(`unauthorized`, `ignored`, `processed`, `duplicate`, `error`, `bad_request`, `llm_guessed`, `llm_unsure`,
+`llm_failed`, and `aborted` locally), never
 message text, balances or errors. The local server checks the secret before reading the body,
 and cuts off slow senders (5s headers, 10s request).
 
@@ -114,12 +115,12 @@ pnpm --filter @hisaab/db db:down -v && pnpm --filter @hisaab/db db:up && pnpm db
 
 Lambda (`nodejs22.x`, arm64) behind an HTTP API in `ap-south-1`, deployed with SAM (`template.yaml`,
 `samconfig.toml`). At cold start it reads one JSON secret, `hisaab/webhook`, from Secrets Manager:
-`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_ID`, `DATABASE_URL`. The bot token is not in it;
+`TELEGRAM_WEBHOOK_SECRET`, `TELEGRAM_ALLOWED_USER_ID`, `DATABASE_URL`, and optionally `SARVAM_API_KEY`. The bot token is not in it;
 replies go back in the response body, so only the laptop needs the token. Logs are kept 14 days.
 
 Prod files on the laptop (gitignored, `chmod 600`):
 - `apps/adapter/.env.production`: `TELEGRAM_BOT_TOKEN`, the **prod** `TELEGRAM_WEBHOOK_SECRET`,
-  `TELEGRAM_ALLOWED_USER_ID`. Read by `webhook:set:prod`.
+  `TELEGRAM_ALLOWED_USER_ID`, and optionally `SARVAM_API_KEY`. `webhook:set:prod` reads the first three; "Push the secret" reads all but the token.
 - `packages/db/.env.production`: `DATABASE_URL`, Supabase's **Session pooler** URI (port 5432), with no
   `?sslmode`. TLS is verified in code against Supabase's CA. Read by `db:migrate:prod`.
 
@@ -171,7 +172,8 @@ Two shared steps, referred to below:
     const a = parseEnv(read("apps/adapter/.env.production", "utf8"));
     const d = parseEnv(read("packages/db/.env.production", "utf8"));
     process.stdout.write(JSON.stringify({ TELEGRAM_WEBHOOK_SECRET: a.TELEGRAM_WEBHOOK_SECRET,
-      TELEGRAM_ALLOWED_USER_ID: a.TELEGRAM_ALLOWED_USER_ID, DATABASE_URL: d.DATABASE_URL }));' |
+      TELEGRAM_ALLOWED_USER_ID: a.TELEGRAM_ALLOWED_USER_ID, DATABASE_URL: d.DATABASE_URL,
+      SARVAM_API_KEY: a.SARVAM_API_KEY }));' |
   aws secretsmanager put-secret-value --secret-id hisaab/webhook --secret-string file:///dev/stdin \
     --profile hisaab --region ap-south-1 --query VersionId --output text
   ```
@@ -200,6 +202,22 @@ Deliveries between steps 2 and 3 get 401, and Telegram retries them. Nothing is 
 
 Messages sent between steps 1 and 3 get the "Something went wrong" reply. That is a 200, so
 Telegram does not retry them: resend them once `accounts` works.
+
+### Category fallback (Sarvam)
+
+With `SARVAM_API_KEY` in the secret, a keyword miss goes to Sarvam for a guess; without it the bot uses keyword rules only.
+There is no migration, and the code is safe to deploy before the key exists.
+
+**Switch it on:**
+1. `pnpm --filter @hisaab/adapter deploy:aws`. Send a keyword entry (`petrol 100 <bank>`), then `undo`.
+2. Put `SARVAM_API_KEY` in `apps/adapter/.env.production`.
+3. Push the secret, then force a cold start.
+4. Send a fake-description entry (`asdfchai 100 <bank>`), then `undo`. The reply says `guessed` or `category needs review`.
+5. `aws logs tail` as above: only labels, such as `llm_guessed`, then `processed`.
+
+**Switch it off:** remove the key from the file, push the secret, then force a cold start. Earlier entries are unchanged.
+
+Guessed rows are the ones with `status = 'NEEDS_REVIEW' AND category IS NOT NULL`.
 
 ### Rotate the bot token
 
