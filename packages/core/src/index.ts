@@ -27,6 +27,13 @@ export {
 } from './keyword-suggestions';
 export { MemoryStore, type MemoryAccount } from './memory-store';
 export {
+  parseReportAnswer,
+  prepareQuestion,
+  reportRequest,
+  type ReportChoice,
+  type ReportPicker,
+} from './question';
+export {
   balanceOf,
   checkInvariants,
   signedBalance,

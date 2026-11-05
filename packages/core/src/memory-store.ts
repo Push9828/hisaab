@@ -120,6 +120,23 @@ export class MemoryStore implements LedgerStore {
         latest.voidedAt = at;
         return Promise.resolve({ description: latest.proposed.description });
       },
+
+      transactionsInRange: ({ start, end }) =>
+        Promise.resolve(
+          draft.transactions
+            .filter(
+              ({ voidedAt, proposed: { occurredAt } }) =>
+                voidedAt === null && occurredAt >= start && occurredAt < end,
+            )
+            .map(({ proposed }) => ({
+              type: proposed.type,
+              occurredAt: proposed.occurredAt,
+              category: proposed.category,
+              spendAmount: proposed.spendAmount,
+              entries: proposed.entries,
+              voidedAt: null,
+            })),
+        ),
     };
   }
 }

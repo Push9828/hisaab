@@ -1,4 +1,6 @@
+import { type DateRange } from './dates';
 import { type Paise } from './money';
+import { type ReportTx } from './reports';
 import { type AccountInfo, type AccountKind, type ProposedTx } from './types';
 
 export interface NewAccount {
@@ -37,6 +39,8 @@ export interface LedgerTxn {
    * description, or null when there is nothing to void.
    */
   voidLatest(at: Date): Promise<{ description: string } | null>;
+  /** Non-voided transactions in the half-open range, in creation order. */
+  transactionsInRange(range: DateRange): Promise<ReportTx[]>;
 }
 
 export interface LedgerStore {

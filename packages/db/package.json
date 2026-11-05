@@ -15,6 +15,7 @@
     "db:check:role:prod": "tsx --env-file=../../apps/dashboard/.env.role-check scripts/check-dashboard-role.ts",
     "db:seed": "tsx --env-file=.env scripts/seed-fake.ts",
     "llm:accuracy": "tsx --env-file=.env scripts/category-accuracy.ts",
+    "llm:questions": "tsx --env-file=.env scripts/question-accuracy.ts",
     "llm:keywords": "tsx --env-file=.env scripts/keyword-suggestions.ts",
     "llm:keywords:prod": "tsx --env-file=.env --env-file=.env.production scripts/keyword-suggestions.ts --production",
     "db:generate": "drizzle-kit generate",

@@ -20,13 +20,14 @@ It is single-user by design. There is no hosted version: you run your own copy w
 | `dinner 4000 split john 1000 sam 1000 cc icici` | Only your own share is spending; the rest is owed to you. |
 | `bal icici 85000` | Reconciles to the real balance with a visible correction, kept out of cash flow. |
 | `undo` | Voids the latest transaction. Nothing is ever deleted. |
+| `ask food last month` | Answers from a fixed report. An LLM picks the report and month; code calculates the figure. |
 
 The full grammar and worked examples are in [`docs/SPEC.md`](docs/SPEC.md).
 
 ## Why it is built this way
 
 - **Money is integer paise in `BigInt`.** Never floats, and amounts that are not whole paise are refused rather than rounded.
-- **Parsing is deterministic.** Amounts, accounts and transaction types never come from an LLM.
+- **Parsing is deterministic.** Amounts, accounts and transaction types never come from an LLM. It may only pick from fixed lists: a category for a description no keyword settled, or a report and month for a question.
 - **Balances are derived**, from an opening balance plus entries. No running balance is stored, so it cannot drift.
 - **Ambiguous input writes nothing.** The bot asks a question instead of guessing.
 - **Webhook replays are no-ops**, enforced by a unique key claimed in the same database transaction as the write.

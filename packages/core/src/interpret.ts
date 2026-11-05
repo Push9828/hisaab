@@ -8,6 +8,7 @@ import {
   signedBalance,
 } from './ledger';
 import { type Command, parseMessage } from './parser';
+import { prepareQuestion } from './question';
 import {
   type AccountInfo,
   type AccountKind,
@@ -72,6 +73,9 @@ function execute(command: Command, at: Date, ctx: Context): Result {
 
     case 'accounts':
       return { kind: 'balances', accountIds: ctx.accounts.map((a) => a.id) };
+
+    case 'ask':
+      return prepareQuestion(command.question, ctx.accounts);
 
     case 'open':
       return open(command.alias, command.accountKind, command.amount, ctx);

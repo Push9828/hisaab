@@ -1,10 +1,10 @@
 import { createServer, type Server } from 'node:http';
 import { type AddressInfo } from 'node:net';
 
-import { CATEGORY_PROMPT } from '@hisaab/core';
+import { CATEGORY_PROMPT, reportRequest } from '@hisaab/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { sarvamCategorizer } from './sarvam';
+import { sarvamCategorizer, sarvamReportPicker } from './sarvam';
 
 // Real HTTP against a local server, because the timeout and the redirect rule are
 // fetch's behaviour. Only the URL is swapped. The key is fake.
@@ -36,6 +36,35 @@ afterEach(async () => {
 
 const OK_BODY = JSON.stringify({
   choices: [{ message: { content: '{"category":"Food"}' } }],
+});
+
+describe('sarvamReportPicker', () => {
+  it('sends the question under the report schema, with the key only in the header', async () => {
+    let seen: { key: unknown; body: string } | undefined;
+    await serve((req, res) => {
+      let body = '';
+      req.on('data', (chunk: Buffer) => (body += chunk.toString()));
+      req.on('end', () => {
+        seen = { key: req.headers['api-subscription-key'], body };
+        res.end(OK_BODY);
+      });
+    });
+    await sarvamReportPicker(KEY).pick('food last month');
+    expect(seen?.key).toBe(KEY);
+    expect(seen?.body).not.toContain(KEY);
+    expect(JSON.parse(seen?.body ?? '')).toEqual(
+      JSON.parse(JSON.stringify(reportRequest('food last month'))),
+    );
+  });
+
+  it('shares the redirect and timeout rules', async () => {
+    await serve((_, res) => {
+      res.statusCode = 302;
+      res.setHeader('location', '/elsewhere');
+      res.end();
+    });
+    await expect(sarvamReportPicker(KEY).pick('food')).rejects.toThrow();
+  });
 });
 
 describe('sarvamCategorizer', () => {

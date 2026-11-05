@@ -52,13 +52,22 @@ export type ClarifyReason =
   | 'BAD_SPLIT'
   | 'SPLIT_EXCEEDS_TOTAL'
   | 'DUPLICATE_ALIAS'
-  | 'RESERVED_ALIAS';
+  | 'RESERVED_ALIAS'
+  | 'BAD_QUESTION';
 
 /** Ambiguous input: nothing is written, the user is asked a question. */
 export interface Clarify {
   kind: 'clarify';
   reason: ClarifyReason;
   question: string;
+}
+
+/** An `ask` the filter left unchanged. `text` is what may leave for the LLM. */
+export interface Question {
+  kind: 'question';
+  text: string;
+  /** A 20xx word read by code, so the LLM never chooses a year. */
+  year: number | null;
 }
 
 export type Result =
@@ -73,6 +82,7 @@ export type Result =
   | { kind: 'undo' }
   | { kind: 'balances'; accountIds: string[] }
   | { kind: 'matches'; accountId: string; balance: Paise }
+  | Question
   | Clarify;
 
 export const clarify = (reason: ClarifyReason, question: string): Clarify => ({

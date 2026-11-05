@@ -53,6 +53,40 @@ export function storeContract(name: string, make: () => Promise<LedgerStore>) {
       expect(await balance(store)).toBe(900n);
     });
 
+    it('reads transactions in a half-open range, leaving out voided ones', async () => {
+      const store = await make();
+      const a = await seed(store);
+      const at = (id: string, occurredAt: Date) =>
+        store.run((db) =>
+          db.insertTransaction({ ...tx(a, id, 1n), occurredAt }, meta(id)),
+        );
+      const start = new Date('2026-10-01T00:00:00Z');
+      const end = new Date('2026-11-01T00:00:00Z');
+      await at('first', start);
+      await at('voided', start);
+      await store.run((db) => db.voidLatest(end));
+      await at('last', new Date(end.getTime() - 1));
+      await at('before', new Date(start.getTime() - 1));
+      await at('after', end);
+
+      const rows = await store.run((db) =>
+        db.transactionsInRange({ start, end }),
+      );
+      expect(rows.map((r) => r.occurredAt)).toEqual([
+        start,
+        new Date(end.getTime() - 1),
+      ]);
+      expect(Object.keys(rows[0] ?? {}).sort()).toEqual([
+        'category',
+        'entries',
+        'occurredAt',
+        'spendAmount',
+        'type',
+        'voidedAt',
+      ]);
+      expect(rows[0]?.entries).toEqual([{ accountId: a, amount: -1n }]);
+    });
+
     it('stores and returns an INVESTMENT account', async () => {
       const store = await make();
       await store.run((db) =>

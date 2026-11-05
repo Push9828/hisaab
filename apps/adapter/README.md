@@ -15,7 +15,7 @@ takes the bot away from production until you run `webhook:set:prod` again.
 `handleWebhook` (`src/telegram.ts`) checks the secret header, then the message shape, then the
 sender. Anything it does not handle gets a silent 200. Logs are a startup line plus fixed labels
 (`unauthorized`, `ignored`, `processed`, `duplicate`, `error`, `bad_request`, `llm_guessed`, `llm_unsure`,
-`llm_failed`, and `aborted` locally), never
+`llm_answered`, `llm_failed`, and `aborted` locally), never
 message text, balances or errors. The local server checks the secret before reading the body,
 and cuts off slow senders (5s headers, 10s request).
 
@@ -203,9 +203,10 @@ Deliveries between steps 2 and 3 get 401, and Telegram retries them. Nothing is 
 Messages sent between steps 1 and 3 get the "Something went wrong" reply. That is a 200, so
 Telegram does not retry them: resend them once `accounts` works.
 
-### Category fallback (Sarvam)
+### Category fallback and `ask` questions (Sarvam)
 
-With `SARVAM_API_KEY` in the secret, a keyword miss goes to Sarvam for a guess; without it the bot uses keyword rules only.
+With `SARVAM_API_KEY` in the secret, a keyword miss goes to Sarvam for a guess, and an `ask` question for a report choice; without it the
+bot uses keyword rules only and questions are switched off.
 There is no migration, and the code is safe to deploy before the key exists.
 
 **Switch it on:**
@@ -213,7 +214,8 @@ There is no migration, and the code is safe to deploy before the key exists.
 2. Put `SARVAM_API_KEY` in `apps/adapter/.env.production`.
 3. Push the secret, then force a cold start.
 4. Send a fake-description entry (`asdfchai 100 <bank>`), then `undo`. The reply says `guessed` or `category needs review`.
-5. `aws logs tail` as above: only labels, such as `llm_guessed`, then `processed`.
+5. Send `ask total this month`, then `ask breakdown this month`, then `ask spend on <bank>`, which is refused. Check that the first two match the dashboard.
+6. `aws logs tail` as above: only labels, such as `llm_guessed` or `llm_answered`, then `processed`.
 
 **Switch it off:** remove the key from the file, push the secret, then force a cold start. Earlier entries are unchanged.
 

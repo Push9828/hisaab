@@ -25,7 +25,8 @@ export type Command =
     }
   | { type: 'bal'; account?: string; stated?: Paise }
   | { type: 'accounts' }
-  | { type: 'undo' };
+  | { type: 'undo' }
+  | { type: 'ask'; question: string };
 
 export type Parsed =
   { kind: 'parsed'; command: Command; occurredAt: Date } | Clarify;
@@ -41,6 +42,7 @@ const COMMANDS = [
   'bal',
   'undo',
   'accounts',
+  'ask',
 ];
 const RESERVED = new Set([
   ...COMMANDS,
@@ -302,6 +304,7 @@ const NO_DATE: Record<string, true> = {
   bal: true,
   undo: true,
   accounts: true,
+  ask: true,
 };
 
 export function parseMessage(text: string, now: Date): Parsed {
@@ -360,6 +363,12 @@ export function parseMessage(text: string, now: Date): Parsed {
       break;
     case 'accounts':
       command = args.length === 0 ? { type: 'accounts' } : unknown();
+      break;
+    case 'ask':
+      command = {
+        type: 'ask',
+        question: args.map((t) => t.raw).join(' '),
+      };
       break;
     default:
       command = splitAt > 0 ? parseSplit(toks, splitAt) : parseExpense(toks);

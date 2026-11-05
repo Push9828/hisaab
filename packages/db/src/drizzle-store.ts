@@ -3,7 +3,12 @@ import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
 import { parseDatabaseUrl } from './database-url';
-import { accountsWithBalances, setStatementTimeout, type Tx } from './reads';
+import {
+  accountsWithBalances,
+  setStatementTimeout,
+  type Tx,
+  transactionsBetween,
+} from './reads';
 import { accounts, entries, processedMessages, transactions } from './schema';
 
 import type {
@@ -93,6 +98,8 @@ function handle(tx: Tx): LedgerTxn {
     },
 
     accounts: () => accountsWithBalances(tx),
+
+    transactionsInRange: (range) => transactionsBetween(tx, range),
 
     async createAccount(account: NewAccount) {
       await tx.insert(accounts).values({

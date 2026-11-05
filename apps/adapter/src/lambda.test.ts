@@ -224,6 +224,40 @@ describe('lambda handler: SARVAM_API_KEY is optional', () => {
     expect(consoleCalls).toEqual([['llm_failed'], ['processed']]);
   });
 
+  it('with the key, a question is answered through the same key', async () => {
+    aws.send.mockResolvedValue({
+      SecretString: secretString({ SARVAM_API_KEY: SARVAM_KEY }),
+    });
+    fetchStub.mockImplementation(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content:
+                    '{"report":"total","month":"this_month","category":"none"}',
+                },
+              },
+            ],
+          }),
+        ),
+      ),
+    );
+    const handler = await load();
+    const res = await handler(event('ask total'));
+    expect(replyText(res.body)).toBe('Oct 2026, all spending: 0.');
+    expect(consoleCalls).toEqual([['llm_answered'], ['processed']]);
+  });
+
+  it('without the key, questions are switched off and nothing is fetched', async () => {
+    const handler = await load();
+    const res = await handler(event('ask total'));
+    expect(replyText(res.body)).toContain('switched off');
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(consoleCalls).toEqual([['processed']]);
+  });
+
   it.each([
     ['missing', {}],
     ['empty', { SARVAM_API_KEY: '' }],

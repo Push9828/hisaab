@@ -32,15 +32,19 @@ export interface Suggestion {
   text: string;
 }
 
-/** A card's alias joins its words (`hdfc cc` is `hdfccc`), so the bank name and `cc` are added. */
+/**
+ * A card's alias joins its words (`hdfc cc` is `hdfccc`), so the bank name and `cc`
+ * are added. An alias can also end in a number (`sbi2`, `axis2cc`), so it is added
+ * without that too.
+ */
 export const accountWords = (
   accounts: readonly Pick<AccountInfo, 'alias' | 'name' | 'kind'>[],
 ): string[] =>
-  accounts.flatMap(({ alias, name, kind }) =>
-    kind === 'CREDIT_CARD'
-      ? [alias, name, alias.replace(/cc$/, ''), 'cc']
-      : [alias, name],
-  );
+  accounts.flatMap(({ alias, name, kind }) => {
+    const bank = kind === 'CREDIT_CARD' ? alias.replace(/cc$/, '') : alias;
+    const words = [alias, name, bank, bank.replace(/[0-9]+$/, '')];
+    return [...new Set(kind === 'CREDIT_CARD' ? [...words, 'cc'] : words)];
+  });
 
 /** Split like a description, because `john-k` is a valid alias and tokenizes to two words. */
 export const aliasTokens = (aliases: readonly string[]): ReadonlySet<string> =>

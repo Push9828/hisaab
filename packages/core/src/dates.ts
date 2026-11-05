@@ -1,7 +1,7 @@
 // IST is a fixed UTC+5:30 with no DST, so no timezone database is needed.
 const IST_OFFSET_MS = 330 * 60_000;
 
-const MONTHS = [
+export const MONTHS = [
   'january',
   'february',
   'march',
@@ -14,7 +14,7 @@ const MONTHS = [
   'october',
   'november',
   'december',
-];
+] as const;
 
 const MONTH_LABELS = [
   'Jan',
@@ -73,6 +73,9 @@ export function istMonthOf(date: Date): Month {
   const { year, month } = istDay(date);
   return { year, month };
 }
+
+export const monthLabel = ({ year, month }: Month): string =>
+  `${MONTH_LABELS[month - 1]} ${year}`;
 
 export const istMonthRange = (year: number, month: number): DateRange => ({
   start: new Date(Date.UTC(year, month - 1, 1) - IST_OFFSET_MS),

@@ -1,6 +1,11 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { ingest, type Categorizer, type LedgerStore } from '@hisaab/core';
+import {
+  ingest,
+  type Categorizer,
+  type LedgerStore,
+  type ReportPicker,
+} from '@hisaab/core';
 
 export interface WebhookConfig {
   secret: string;
@@ -16,6 +21,7 @@ export type LogLabel =
   | 'duplicate'
   | 'error'
   | 'llm_guessed'
+  | 'llm_answered'
   | 'llm_unsure'
   | 'llm_failed';
 
@@ -43,6 +49,8 @@ export interface WebhookDeps {
   log: (label: LogLabel) => void;
   /** Absent means keyword rules only. */
   categorizer?: Categorizer | undefined;
+  /** Absent means questions are switched off. */
+  reportPicker?: ReportPicker | undefined;
 }
 
 /** The fields we read from a Telegram `Message`. Everything else is ignored. */
@@ -96,7 +104,7 @@ export function parseConfig(
  */
 export async function handleWebhook(
   req: WebhookRequest,
-  { config, store, log, categorizer }: WebhookDeps,
+  { config, store, log, categorizer, reportPicker }: WebhookDeps,
 ): Promise<WebhookResponse> {
   if (!hasValidSecret(req.headers, config.secret)) {
     log('unauthorized');
@@ -128,6 +136,7 @@ export async function handleWebhook(
       },
       store,
       categorizer,
+      reportPicker,
     );
     if (result.llm) log(`llm_${result.llm}`);
     log(result.duplicate ? 'duplicate' : 'processed');

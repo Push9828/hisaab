@@ -1,5 +1,6 @@
 import { formatDay, sameIstDay } from './dates';
 import { formatInr } from './money';
+import { QUESTIONS_OFF } from './question';
 import { type Context, type ProposedTx, type Result } from './types';
 
 const UNDO_HINT = 'Reply "undo" to revert.';
@@ -13,6 +14,10 @@ export function reply(result: Result, ctx: Context): string {
   switch (result.kind) {
     case 'clarify':
       return result.question;
+
+    case 'question':
+      // With a picker, `ingest` answers the question and never gets here.
+      return QUESTIONS_OFF;
 
     case 'undo':
       return 'Reverting the last transaction.';

@@ -460,3 +460,88 @@ describe('handleWebhook: category fallback', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+describe('handleWebhook: ask', () => {
+  const ACCOUNT = {
+    id: 'a',
+    alias: 'tbank',
+    name: 'TBANK',
+    kind: 'BANK',
+    openingBalance: 100_000n,
+  } as const;
+
+  function withPicker(pick: () => Promise<unknown>) {
+    const logs: LogLabel[] = [];
+    const spy = vi.fn(pick);
+    const post = (body: unknown, secret = SECRET) =>
+      handleWebhook(
+        {
+          headers: { 'x-telegram-bot-api-secret-token': secret },
+          body: JSON.stringify(body),
+        },
+        {
+          config: CONFIG,
+          store: new MemoryStore([ACCOUNT]),
+          log: (label) => logs.push(label),
+          reportPicker: { pick: spy },
+        },
+      );
+    return { post, logs, spy };
+  }
+  const TOTAL = JSON.stringify({
+    report: 'total',
+    month: 'this_month',
+    category: 'none',
+  });
+
+  it('answers and logs its label', async () => {
+    const { post, logs } = withPicker(() => Promise.resolve(TOTAL));
+    expect(await post(update('ask total'))).toEqual(
+      replyTo('Oct 2026, all spending: 0.'),
+    );
+    expect(logs).toEqual(['llm_answered', 'processed']);
+  });
+
+  it('a failed call logs labels only, with canaries in the question and the error', async () => {
+    const lines: unknown[][] = [];
+    for (const m of ['log', 'info', 'warn', 'error', 'debug'] as const) {
+      vi.spyOn(console, m).mockImplementation((...args) => {
+        lines.push(args);
+      });
+    }
+    const { post, logs } = withPicker(() =>
+      Promise.reject(new Error('fake failure quoting canaryword')),
+    );
+    const res = await post(update('ask canaryword'));
+    expect(JSON.stringify(res)).not.toContain('fake failure');
+    expect(logs).toEqual(['llm_failed', 'processed']);
+    expect(lines).toEqual([]);
+  });
+
+  it('a refused question logs no llm label and makes no call', async () => {
+    const { post, logs, spy } = withPicker(() => Promise.resolve(TOTAL));
+    await post(update('ask spend on tbank'));
+    expect(spy).not.toHaveBeenCalled();
+    expect(logs).toEqual(['processed']);
+  });
+
+  it.each([
+    ['a wrong secret', {}, 'wrong-secret'],
+    ['a stranger', { fromId: STRANGER }, SECRET],
+    ['a group chat', { chatType: 'group' }, SECRET],
+  ])('%s never reaches the LLM', async (_, overrides, secret) => {
+    const { post, spy } = withPicker(() => Promise.resolve(TOTAL));
+    await post(update('ask total', overrides), secret);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('a forward never reaches the LLM', async () => {
+    const { post, spy } = withPicker(() => Promise.resolve(TOTAL));
+    const forwarded = update('ask total');
+    await post({
+      ...forwarded,
+      message: { ...forwarded.message, forward_origin: { type: 'user' } },
+    });
+    expect(spy).not.toHaveBeenCalled();
+  });
+});

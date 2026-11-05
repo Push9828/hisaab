@@ -44,8 +44,9 @@ Run `pnpm typecheck && pnpm lint && pnpm test` before declaring any task done.
 
 1. **Money is integer paise (BigInt). Never `number` floats for money.** Parse "4k" to 400000n.
 2. **No LLM touches amounts, accounts, or transaction type.** In the bot it may only pick a
-   category from a fixed list, from free-text description. A script the owner runs may also
-   propose keywords, which the owner reviews before adding. Everything else is deterministic.
+   category from a fixed list, from free-text description, or pick a fixed read-only report with
+   a month and category filter, whose answer existing code calculates. A script the owner runs may
+   also propose keywords, which the owner reviews before adding. Everything else is deterministic.
 3. **TRANSFER and ADJUSTMENT always have `spendAmount = 0`.** This is what keeps card bill
    payments and internal transfers out of spending reports.
 4. **Nothing is hard-deleted.** Undo = void (`voidedAt`). Voided rows are excluded from balances.

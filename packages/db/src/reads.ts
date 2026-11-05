@@ -134,50 +134,56 @@ export async function countConfirmedWithKeyword(
  */
 export function readTransactions(
   db: Db,
+  range: DateRange,
+): Promise<ReportTx[]> {
+  return readOnly(db, (tx) => transactionsBetween(tx, range));
+}
+
+/** Shared with DrizzleStore, so the bot and the dashboard cannot drift apart. */
+export async function transactionsBetween(
+  tx: Tx,
   { start, end }: DateRange,
 ): Promise<ReportTx[]> {
-  return readOnly(db, async (tx) => {
-    // A left join, so that a transaction with no entries keeps its spend.
-    const rows = await tx
-      .select({
-        id: transactions.id,
-        type: transactions.type,
-        occurredAt: transactions.occurredAt,
-        category: transactions.category,
-        spendAmount: transactions.spendAmount,
-        accountId: entries.accountId,
-        amount: entries.amount,
-      })
-      .from(transactions)
-      .leftJoin(entries, eq(entries.transactionId, transactions.id))
-      .where(
-        and(
-          isNull(transactions.voidedAt),
-          gte(transactions.occurredAt, start),
-          lt(transactions.occurredAt, end),
-        ),
-      )
-      .orderBy(asc(transactions.seq));
+  // A left join, so that a transaction with no entries keeps its spend.
+  const rows = await tx
+    .select({
+      id: transactions.id,
+      type: transactions.type,
+      occurredAt: transactions.occurredAt,
+      category: transactions.category,
+      spendAmount: transactions.spendAmount,
+      accountId: entries.accountId,
+      amount: entries.amount,
+    })
+    .from(transactions)
+    .leftJoin(entries, eq(entries.transactionId, transactions.id))
+    .where(
+      and(
+        isNull(transactions.voidedAt),
+        gte(transactions.occurredAt, start),
+        lt(transactions.occurredAt, end),
+      ),
+    )
+    .orderBy(asc(transactions.seq));
 
-    const byId = new Map<string, ReportTx>();
-    for (const row of rows) {
-      let report = byId.get(row.id);
-      if (!report) {
-        report = {
-          type: row.type,
-          occurredAt: row.occurredAt,
-          // Only core's fixed list is ever written to this column.
-          category: row.category as Category | null,
-          spendAmount: row.spendAmount,
-          entries: [],
-          voidedAt: null,
-        };
-        byId.set(row.id, report);
-      }
-      if (row.accountId !== null && row.amount !== null) {
-        report.entries.push({ accountId: row.accountId, amount: row.amount });
-      }
+  const byId = new Map<string, ReportTx>();
+  for (const row of rows) {
+    let report = byId.get(row.id);
+    if (!report) {
+      report = {
+        type: row.type,
+        occurredAt: row.occurredAt,
+        // Only core's fixed list is ever written to this column.
+        category: row.category as Category | null,
+        spendAmount: row.spendAmount,
+        entries: [],
+        voidedAt: null,
+      };
+      byId.set(row.id, report);
     }
-    return [...byId.values()];
-  });
+    if (row.accountId !== null && row.amount !== null) {
+      report.entries.push({ accountId: row.accountId, amount: row.amount });
+    }
+  }
+  return [...byId.values()];
 }

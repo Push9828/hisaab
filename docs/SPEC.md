@@ -12,7 +12,7 @@ Secondary goal: a portfolio piece with HLD/LLD write-ups. The public version is
 the source code: anyone can run their own single-user copy with their own tokens
 and accounts. There is no hosted public instance. Portfolio screenshots use
 **seeded fake data only**. Real data stays in the private deployment, with one exception: from M5.2,
-free-text descriptions go to the chosen LLM provider (section 9).
+free-text descriptions, and from M5.4 the text of `ask` questions, go to the chosen LLM provider (section 9).
 
 ## 2. Goals (v1)
 
@@ -143,6 +143,19 @@ Category fallback: the LLM's answer is given in each example, and only the categ
 16. **Nothing to send**: `john 500 icici` when `john` is an account. No call. Stored as in example 15.
 17. **Keyword hit**: example 1 makes no call, and stays Transport and `CONFIRMED`.
 
+Ledger questions: asked in Nov 2026, after examples 1-8 were logged in Oct 2026. The LLM's choice is given in each example.
+
+18. **All spending**: `ask total last month`, LLM picks total, last month. Reply: `Oct 2026, all spending: 38,000.`
+19. **One category**: `ask emi last month`, LLM picks category Home loan EMI, last month. Reply: `Oct 2026, Home loan EMI: 32,000.`
+20. **By category**: `ask kharcha october ka breakdown`, LLM picks breakdown, october. Reply, one line each:
+    `Oct 2026, spending by category:`, `Home loan EMI: 32,000`, `Transport: 4,000`, `Food: 2,000`, `Total: 38,000`.
+21. **A stated year**: `ask food october 2025` sends `food october`, and code reads the year. Reply: `Oct 2025, Food: 0.`
+22. **Future month refused**: `ask food december`, LLM picks category Food, december. A clarifying question, because December 2026 has not happened.
+23. **Refused with no call**: `ask spend on icici`, `ask food last 3 months` and `ask priya 500 icici` each get a clarifying
+    question, because the filter would remove a word or a number and so change the question.
+24. **No usable answer**: on `unsure`, an answer off the list or a failed call, a fixed reply that says what it can answer or to try again.
+    Nothing is written or claimed by any question, and no figure comes from the LLM.
+
 ## 6. Message grammar (final, M1)
 
 Deterministic, tokenized, case-insensitive. No LLM in parsing. Implemented in `packages/core`.
@@ -160,6 +173,7 @@ open <alias> <amount> <kind>                       kinds: bank cc receivable pay
 bal [<account>] [<amount>]                         show balance, or reconcile to stated amount
 accounts                                           list accounts and balances
 undo                                               void the latest non-voided transaction (adjustments included; `open` is not undoable)
+ask <question>                                     a spending question, answered from a fixed report
 ```
 
 - At the end of an expense, `in`, `emi`, `lend`, `got` or `split`, the account is one alias or
@@ -193,6 +207,17 @@ undo                                               void the latest non-voided tr
 - Unrecognised category (expenses and splits): no keyword match, keywords from two categories, or an
   income category such as "salary advance", stores the transaction with status `NEEDS_REVIEW`. The category is
   the LLM's guess if it gave one (see Categories below), else null. Income is `Salary` on a salary keyword, else `Other income`.
+
+- `ask` (M5.4): an entry can no longer have a description starting with `ask`. It takes no date prefix. It writes and claims
+  nothing. The LLM picks one of three reports (`total`, `category`, `breakdown`) and one month, and code does the rest:
+  - One `20xx` word right after a month name is read by code as the year, and is not sent. Any other number is refused.
+  - With no month, it means this month. Only this month, last month or a named month can be asked for. A named month
+    with no year is in the current IST year, and a future month is refused, never rolled back a year.
+  - The category filter is the spending categories. Uncategorised can't be asked for, but it appears in `breakdown`.
+  - The question is refused, with no call, if the filter would remove anything from it, if a word resembles an account (`johns` or `kotak` for
+    `kotakbank`, or `ic ici` for `icici`), or if it has anything outside plain ASCII, is empty, or is over 100 characters. Dropping a
+    word could turn it into a different question with a confident answer. An innocent word can be refused too, which only costs a re-type.
+  - The reply shows the month and report, so a misread is visible. With no key configured, questions are switched off.
 
 Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI-CC. Reply "undo" to revert.`
 
@@ -228,6 +253,8 @@ thin adapter, so the channel can be swapped without touching ledger logic.
 
 The LLM call happens between two database transactions, never inside one, so a slow provider cannot hold the
 ledger lock. The first transaction finds the miss and writes nothing. The second checks and interprets again, claims and writes.
+
+An `ask` question works the same way, except that its second transaction only reads, in a callback typed to the one read method.
 
 Later: EventBridge -> Lambda for recurring rules (rent, SIP, monthly transfer) and
 for Splitwise polling.
@@ -311,7 +338,7 @@ identity `seq`), `schema.ts` is the truth.
 - Logs must not contain full message bodies or balances.
 - From M5.2, free-text descriptions go to the chosen LLM provider, and they may hold names and identifiers. Parsed amounts
   and accounts are not sent.
-- The M5.2 script (`llm:keywords`) drops account aliases, account names, a card's bank name, any token with a digit and any word with an `@`, so
+- The M5.2 script (`llm:keywords`) drops account aliases, account names, a card's bank name, an alias without its trailing number (`sbi` for `sbi2`), any token with a digit and any word with an `@`, so
   `dinner with john` goes as `dinner with` if `john` is an account, and `card xx1234 fee` as `card fee`. It shows the owner the
   text and a code, and sends exactly that text only with `--send=<code>`. It cannot catch a person with no account, a
   relation, a place or a spelled-out amount. It writes no file, and on production it needs the `llm:keywords:prod` script and
@@ -320,6 +347,10 @@ identity `seq`), `schema.ts` is the truth.
   with no preview, one request per keyword miss. Text over 100 characters after the filter is not sent. It sends no parsed
   amount, account or date, and no balance. It has a 3-second timeout, no retries and refuses redirects. Its text and answers
   are never logged: only the labels `llm_guessed`, `llm_unsure` and `llm_failed`. Removing the key from the secret switches it off.
+- From M5.4 the text of an `ask` question goes to the LLM provider with no preview, under the same filter, limits and network rules as
+  the fallback. It can still hold a name with no account, or a relation. A question goes only after the secret and sender checks, and
+  sends no ledger data. The LLM's text never reaches a reply or a log: replies are built by code from the validated choice. The
+  labels are `llm_answered`, `llm_unsure` and `llm_failed`.
 - Keywords live in a public repo, so only national brands and generic words are added, never a local shop or a person.
 - The webhook secret lives in AWS Secrets Manager in production and in the gitignored `.env` locally.
 - The bot token is never given to the Lambda: replies go back in the webhook response, so only the
@@ -338,7 +369,7 @@ identity `seq`), `schema.ts` is the truth.
 | M5.1 | Investment accounts: `INVESTMENT` kind, section 5 examples 9-12, "Invested" on the dashboard | Nov 4 |
 | M5.2 | Keyword suggestions: a script the owner runs by hand uses an LLM to propose keywords from uncategorised descriptions; the owner reviews them before adding any; no LLM in the bot | Nov 4 |
 | M5.3 | Category fallback: on a keyword miss the LLM picks a spending category from the fixed list; a guess stays `NEEDS_REVIEW` and the reply says so; a failed, invalid or `unsure` answer leaves the category null | Nov 5 |
-| M5.4 | Ledger questions: the LLM picks a fixed read-only report and its filters, and existing code calculates the answer. Needs the owner's change to hard rule 2 and a decision on section 3, because filters could name an account or type | later |
+| M5.4 | Ledger questions: `ask`; the LLM picks a fixed read-only report, with a month and category filter, and existing code calculates the answer. No account or type filter, so section 3 is unchanged | Nov 5 |
 | M6 | Recurring rules via EventBridge | later |
 | M7 | Splitwise read-only sync (flat expenses) | later |
 
@@ -373,6 +404,8 @@ is enough.
 - **A wrong guess counts under the wrong category.** In the 2026-11-05 test about 1 in 8 fake descriptions got a wrong
   category, and answers vary between runs. The reply shows the guess. `undo` and a resend may return the same guess, and only
   the latest entry can be undone, so the reliable fix is a keyword, then `undo` and a resend.
+- **An `ask` figure can include wrong guesses.** A category figure counts guessed rows, as the dashboard does, with no marker,
+  so the two always agree. A misread question shows in the reply's month and report label.
 - **The fallback reads Latin letters only.** Devanagari text and any word with a digit, such as `zee5`, are dropped before
   sending, so those need a keyword.
 - Backdated entries: DECIDED, supported via `yesterday` / `on 20 oct` prefix. Exact grammar in M1. See DECISIONS.md.
