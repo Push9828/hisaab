@@ -65,7 +65,7 @@ const CASES: readonly (readonly [description: string, expected: string])[] = [
   ['oyo', 'Travel'],
   ['visa fee', 'Travel'],
   ['chatgpt plus', 'Subscriptions'],
-  ['home loan installment', 'Home loan EMI'],
+  ['home loan installment', UNSURE],
   ['misc', UNSURE],
   ['asdf', UNSURE],
   ['alex', UNSURE],

@@ -24,6 +24,13 @@ export const SPENDING_CATEGORIES: readonly Category[] = CATEGORIES.filter(
   (c) => !INCOME_CATEGORIES.includes(c),
 );
 
+/**
+ * Spending only, and not Home loan EMI: that comes from the `emi` command, and a guess or a
+ * proposed keyword for it (e.g. for "home decor") is almost always wrong.
+ */
+export const GUESSABLE_CATEGORIES: readonly Category[] =
+  SPENDING_CATEGORIES.filter((c) => c !== 'Home loan EMI');
+
 /** Spending never carries an income category; it goes to review instead. */
 export const spendCategory = (c: Category | null): Category | null =>
   c !== null && INCOME_CATEGORIES.includes(c) ? null : c;

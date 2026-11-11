@@ -660,3 +660,9 @@ full it goes to the LLM fallback. Words that are also common names (`pooja`, `pu
 SPEC rule "never a person": "pooja samagri" still matches on `samagri`, and "pooja" alone goes to the fallback. `parlour`,
 `temple` and `donation` are keywords, accepting that "ice cream parlour" or a non-religious donation could land there: a
 wrong keyword only moves spend between categories, and the reply shows it.
+
+**The category fallback can no longer guess Home loan EMI.** The owner's decision. Why: that category comes from the `emi`
+command, and on real use the LLM picked it for a description that only contained the word "home". A guess of EMI also puts
+ordinary spend in a figure the dashboard shows apart. `ask` can still filter by Home loan EMI, since that is a question and
+not a guess. The keyword script (M5.2) cannot propose an EMI keyword either, so `emi` stays the only source. A description
+with no keyword that really is an EMI now gets another category or `unsure`; use `emi`.

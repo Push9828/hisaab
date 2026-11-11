@@ -124,6 +124,7 @@ describe('parseSuggestion', () => {
     ['unsure', answer('chai', 'unsure'), 'unsure'],
     ['an income category', answer('chai', 'Salary'), 'bad-category'],
     ['a made-up category', answer('chai', 'Snacks'), 'bad-category'],
+    ['Home loan EMI', answer('chai', 'Home loan EMI'), 'bad-category'],
     ['upper case', answer('Chai', 'Food'), 'bad-keyword'],
     ['two words', answer('two words', 'Food'), 'bad-keyword'],
     ['no keyword', JSON.stringify({ category: 'Food' }), 'bad-keyword'],

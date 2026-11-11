@@ -4,8 +4,8 @@ import {
   accountWords,
   parseSuggestion,
   prepareBatch,
+  GUESSABLE_CATEGORIES,
   rowsCategorised,
-  SPENDING_CATEGORIES,
   summarise,
   type Suggestion,
 } from '@hisaab/core';
@@ -87,7 +87,7 @@ async function askSarvam(text: string): Promise<unknown> {
               keyword: { type: 'string' },
               category: {
                 type: 'string',
-                enum: [...SPENDING_CATEGORIES, UNSURE],
+                enum: [...GUESSABLE_CATEGORIES, UNSURE],
               },
             },
             required: ['keyword', 'category'],

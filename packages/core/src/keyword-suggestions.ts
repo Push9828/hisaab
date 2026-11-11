@@ -1,6 +1,6 @@
 import {
   categorize,
-  SPENDING_CATEGORIES,
+  GUESSABLE_CATEGORIES,
   tokenize,
   type Category,
 } from './categories';
@@ -111,7 +111,7 @@ export function parseSuggestion(
 
   const { keyword, category } = parsed as Record<string, unknown>;
   if (category === 'unsure') return { ok: false, reason: 'unsure' };
-  const allowed = SPENDING_CATEGORIES.find((c) => c === category);
+  const allowed = GUESSABLE_CATEGORIES.find((c) => c === category);
   if (!allowed) return { ok: false, reason: 'bad-category' };
   if (typeof keyword !== 'string' || !/^[a-z0-9]+$/.test(keyword)) {
     return { ok: false, reason: 'bad-keyword' };

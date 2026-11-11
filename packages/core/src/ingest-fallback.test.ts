@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CATEGORIES, SPENDING_CATEGORIES } from './categories';
+import { CATEGORIES, GUESSABLE_CATEGORIES } from './categories';
 import { ACCOUNTS, NOW } from './fixtures';
 import { ingest } from './ingest';
 import { MemoryStore } from './memory-store';
@@ -78,6 +78,7 @@ describe('SPEC section 5: category fallback', () => {
     ['unsure', answers('unsure'), 'unsure'],
     ['an income category', answers('Salary'), 'failed'],
     ['a category off the list', answers('Pets'), 'failed'],
+    ['Home loan EMI, which only emi sets', answers('Home loan EMI'), 'failed'],
     ['garbage', { ask: () => Promise.resolve('not json') }, 'failed'],
     ['a rejection', { ask: () => Promise.reject(new Error('down')) }, 'failed'],
     [
@@ -351,7 +352,7 @@ describe('ingest: properties of the fallback (hard rule 2)', () => {
         expect(rest).toEqual(expected);
         expect(rest.status).toBe('NEEDS_REVIEW');
         expect(none).toBeNull();
-        expect(guess === null || SPENDING_CATEGORIES.includes(guess)).toBe(
+        expect(guess === null || GUESSABLE_CATEGORIES.includes(guess)).toBe(
           true,
         );
         expect(await llm.store.run((db) => db.accounts())).toEqual(

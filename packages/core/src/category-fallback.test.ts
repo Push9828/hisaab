@@ -1,7 +1,7 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 
-import { CATEGORIES, SPENDING_CATEGORIES } from './categories';
+import { CATEGORIES, GUESSABLE_CATEGORIES } from './categories';
 import {
   askCategory,
   CATEGORY_OPTIONS,
@@ -14,16 +14,30 @@ import { ACCOUNTS } from './fixtures';
 const answer = (category: unknown) => JSON.stringify({ category });
 
 describe('CATEGORY_OPTIONS', () => {
-  it('is the spending categories and unsure, so never an income category', () => {
-    expect(CATEGORY_OPTIONS).toEqual([...SPENDING_CATEGORIES, 'unsure']);
-    expect(CATEGORY_OPTIONS).toContain('Home loan EMI');
+  it('is the spending categories but Home loan EMI, and unsure', () => {
+    expect(CATEGORY_OPTIONS).toEqual([
+      'Food',
+      'Groceries',
+      'Transport',
+      'Rent',
+      'Utilities',
+      'Shopping',
+      'Entertainment',
+      'Health',
+      'Personal care',
+      'Religious & spiritual',
+      'Travel',
+      'Subscriptions',
+      'unsure',
+    ]);
+    expect(CATEGORY_OPTIONS).not.toContain('Home loan EMI');
     expect(CATEGORY_OPTIONS).not.toContain('Salary');
     expect(CATEGORY_OPTIONS).not.toContain('Other income');
   });
 });
 
 describe('parseCategoryAnswer', () => {
-  it.each(SPENDING_CATEGORIES)('accepts %s', (category) => {
+  it.each(GUESSABLE_CATEGORIES)('accepts %s', (category) => {
     expect(parseCategoryAnswer(answer(category))).toBe(category);
   });
 
@@ -34,6 +48,7 @@ describe('parseCategoryAnswer', () => {
   it.each([
     ['an income category', answer('Salary')],
     ['the other income category', answer('Other income')],
+    ['Home loan EMI, which only the emi command sets', answer('Home loan EMI')],
     ['a category not on the list', answer('Pets')],
     ['the wrong case', answer('food')],
     ['a non-string category', answer(7)],
@@ -55,8 +70,8 @@ describe('parseCategoryAnswer', () => {
     },
   );
 
-  it('returns only a spending category, unsure or null, for any input', () => {
-    const allowed = new Set<unknown>([...SPENDING_CATEGORIES, 'unsure', null]);
+  it('returns only a guessable category, unsure or null, for any input', () => {
+    const allowed = new Set<unknown>([...GUESSABLE_CATEGORIES, 'unsure', null]);
     fc.assert(
       fc.property(
         fc.oneof(

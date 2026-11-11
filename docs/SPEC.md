@@ -224,7 +224,7 @@ Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI
 **Categories** (fixed): Food, Groceries, Transport, Rent, Utilities, Shopping, Entertainment,
 Health, Personal care, Religious & spiritual, Travel, Subscriptions, Home loan EMI, Salary, Other income. A category comes from the keyword rules, the `emi` command
 or the income default. On a miss in an expense or split, the fallback (M5.3) asks the LLM, given the filtered description only.
-It may only choose from this list, excluding the income categories, or answer `unsure`. It never sees or alters amounts, accounts
+It may only choose from this list, excluding the income categories and Home loan EMI (which only `emi` sets), or answer `unsure`. It never sees or alters amounts, accounts
 or type. A guess keeps status `NEEDS_REVIEW` and the reply says `guessed`. An `unsure` answer, an answer off the list or a failed
 call leaves the category null, and the message is still logged. With no key configured, the bot uses keyword rules only. No
 LLM runs in the dashboard.

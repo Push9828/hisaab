@@ -1,4 +1,4 @@
-import { SPENDING_CATEGORIES, type Category } from './categories';
+import { GUESSABLE_CATEGORIES, type Category } from './categories';
 import { accountWords, aliasTokens, sendableText } from './keyword-suggestions';
 
 import type { AccountInfo } from './types';
@@ -10,9 +10,8 @@ export interface Categorizer {
   ask(text: string): Promise<unknown>;
 }
 
-/** Excludes the income categories, because this only ever labels spending. */
 export const CATEGORY_OPTIONS: readonly string[] = [
-  ...SPENDING_CATEGORIES,
+  ...GUESSABLE_CATEGORIES,
   UNSURE,
 ];
 
@@ -32,7 +31,7 @@ export function parseCategoryAnswer(
   if (typeof parsed !== 'object' || parsed === null) return null;
   const { category } = parsed as { category?: unknown };
   if (category === UNSURE) return UNSURE;
-  return SPENDING_CATEGORIES.find((c) => c === category) ?? null;
+  return GUESSABLE_CATEGORIES.find((c) => c === category) ?? null;
 }
 
 /** Longer than any real description, so a long paste is not sent unseen. */

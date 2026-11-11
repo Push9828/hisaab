@@ -1,4 +1,9 @@
-export { CATEGORIES, SPENDING_CATEGORIES, type Category } from './categories';
+export {
+  CATEGORIES,
+  GUESSABLE_CATEGORIES,
+  SPENDING_CATEGORIES,
+  type Category,
+} from './categories';
 export {
   CATEGORY_PROMPT,
   categoryRequest,
