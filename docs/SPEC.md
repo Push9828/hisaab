@@ -222,7 +222,7 @@ ask <question>                                     a spending question, answered
 Reply on every successful write, e.g. `Logged: 4,000 Petrol (Transport) on ICICI-CC. Reply "undo" to revert.`
 
 **Categories** (fixed): Food, Groceries, Transport, Rent, Utilities, Shopping, Entertainment,
-Health, Travel, Subscriptions, Home loan EMI, Salary, Other income. A category comes from the keyword rules, the `emi` command
+Health, Personal care, Religious & spiritual, Travel, Subscriptions, Home loan EMI, Salary, Other income. A category comes from the keyword rules, the `emi` command
 or the income default. On a miss in an expense or split, the fallback (M5.3) asks the LLM, given the filtered description only.
 It may only choose from this list, excluding the income categories, or answer `unsure`. It never sees or alters amounts, accounts
 or type. A guess keeps status `NEEDS_REVIEW` and the reply says `guessed`. An `unsure` answer, an answer off the list or a failed

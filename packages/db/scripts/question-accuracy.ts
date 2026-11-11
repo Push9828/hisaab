@@ -52,6 +52,8 @@ const CASES: readonly (readonly [question: string, expected: string])[] = [
   ['shopping in may', category('Shopping', 'may')],
   ['movies this month', category('Entertainment', THIS)],
   ['medicine and doctor spending in july', category('Health', 'july')],
+  ['haircut spending last month', category('Personal care', LAST)],
+  ['pooja expenses in october', category('Religious & spiritual', 'october')],
   ['travel in august', category('Travel', 'august')],
   ['subscriptions last month', category('Subscriptions', LAST)],
   ['home loan emi in september', category('Home loan EMI', 'september')],

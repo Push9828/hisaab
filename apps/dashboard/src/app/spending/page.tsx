@@ -1,14 +1,16 @@
-import { UNCATEGORISED } from '@hisaab/core';
+import { type Category, UNCATEGORISED } from '@hisaab/core';
 import {
   Car,
   CircleHelp,
   Clapperboard,
+  Flame,
   HeartPulse,
   House,
   Landmark,
   Plane,
   ReceiptText,
   Repeat,
+  Scissors,
   ShoppingBag,
   ShoppingBasket,
   Trophy,
@@ -35,7 +37,7 @@ import { loadPage, type PageProps } from '../../lib/page';
 
 export const dynamic = 'force-dynamic';
 
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
+const CATEGORY_ICONS: Record<Category | typeof UNCATEGORISED, LucideIcon> = {
   Food: Utensils,
   Groceries: ShoppingBasket,
   Transport: Car,
@@ -44,6 +46,8 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   Shopping: ShoppingBag,
   Entertainment: Clapperboard,
   Health: HeartPulse,
+  'Personal care': Scissors,
+  'Religious & spiritual': Flame,
   Travel: Plane,
   Subscriptions: Repeat,
   'Home loan EMI': Landmark,
